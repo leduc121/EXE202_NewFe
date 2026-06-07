@@ -1,0 +1,6 @@
+{
+  "name": "MicroVisuals",
+  "description": "A premium fullscreen cinematic visual hero section featuring a high-fidelity boomerang video canvas, custom liquid-glass glassmorphism effects, and immersive GSAP parallax mouse-tracking layout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
