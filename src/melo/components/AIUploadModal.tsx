@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, X, Check, Loader2, AlertCircle, FileAudio, FileMusic } from 'lucide-react';
 import { Song } from '../types';
 import { songsData } from '../songsData';
+import { api } from '../../lib/api';
 
 interface AIUploadModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
   const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [activeStep, setActiveStep] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -35,11 +37,66 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
     }
   };
 
-  // Triggers simulated transcription logs sequentially
-  const startTranscription = (targetPreset?: Song) => {
+  // Demo presets stay local; uploaded files are sent through the production backend.
+  const startTranscription = async (targetPreset?: Song) => {
     setIsTranscribing(true);
     setProgressLog([]);
     setActiveStep(1);
+    setErrorMessage('');
+
+    if (!targetPreset) {
+      if (!file) {
+        setIsTranscribing(false);
+        setErrorMessage('Please choose an audio file first.');
+        return;
+      }
+
+      if (!api.isAuthenticated()) {
+        setIsTranscribing(false);
+        setErrorMessage('Please sign in before uploading audio.');
+        window.location.hash = '#signin';
+        return;
+      }
+
+      try {
+        setProgressLog(['[0.0s] Connecting to UniWave backend...']);
+        const instrumentId = await api.getDefaultInstrumentId();
+        if (!instrumentId) throw new Error('No active instrument is available in backend');
+
+        setActiveStep(2);
+        setProgressLog((prev) => [...prev, '[0.4s] Uploading audio to Render backend...']);
+        const result = await api.transcribeToSong(file, {
+          instrumentId,
+          onProgress: (percent) => {
+            if (percent >= 99) {
+              setActiveStep(4);
+              setProgressLog((prev) => {
+                if (prev.some((line) => line.includes('AI service is processing'))) return prev;
+                return [...prev, '[1.0s] AI service is processing audio on EC2...'];
+              });
+            }
+          },
+        });
+
+        setActiveStep(7);
+        setProgressLog((prev) => [...prev, '[ready] MIDI score mapped to simulator notes.']);
+        onTranscriptionComplete(
+          result.song.notes.length
+            ? result.song
+            : { ...result.song, notes: songsData[0].notes, duration: songsData[0].duration },
+        );
+        setFile(null);
+        setPromptInput('');
+        onClose();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'AI transcription failed';
+        setErrorMessage(message);
+        setProgressLog((prev) => [...prev, `[error] ${message}`]);
+      } finally {
+        setIsTranscribing(false);
+      }
+      return;
+    }
 
     const logs = [
       'Initializing Melodix AI Music Model...',
@@ -59,9 +116,7 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
         if (index === logs.length - 1) {
           setTimeout(() => {
             setIsTranscribing(false);
-            // Select preset or fallback
-            const finalSong = targetPreset || songsData[Math.floor(Math.random() * songsData.length)];
-            onTranscriptionComplete(finalSong);
+            onTranscriptionComplete(targetPreset);
             setFile(null);
             setPromptInput('');
             onClose();
@@ -196,6 +251,13 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
             </div>
 
             {/* Submit Button */}
+            {errorMessage && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             <button
               onClick={() => startTranscription()}
               id="btn-ai-modal-submit"

@@ -7,6 +7,8 @@ import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
+import { api } from './lib/api';
+import type { Song } from './melo/types';
 
 
 const NAV_LINKS = ['Acoustics', 'Platters', 'Engine', 'Integrations', 'Contact'];
@@ -248,6 +250,34 @@ function PricingSection() {
 
 function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
   const isSignup = mode === 'signup';
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError('');
+    setAuthMessage('');
+    setIsSubmitting(true);
+
+    try {
+      if (isSignup) {
+        await api.register(fullName.trim() || email.split('@')[0], email.trim(), password);
+        setAuthMessage('Account created. Signing you in...');
+      }
+
+      await api.login(email.trim(), password);
+      setAuthMessage('Signed in successfully.');
+      window.location.hash = '#upload';
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <main className="auth-page">
@@ -266,7 +296,7 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
 
       <motion.form
         className="auth-form-card"
-        onSubmit={(event) => event.preventDefault()}
+        onSubmit={handleSubmit}
         initial={{ opacity: 0, y: 38, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.65, delay: 0.16, ease: 'easeOut' }}
@@ -274,18 +304,37 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
         {isSignup && (
           <label>
             Name
-            <input type="text" placeholder="Jane Smith" />
+            <input
+              type="text"
+              placeholder="Jane Smith"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              required
+            />
           </label>
         )}
 
         <label>
           Email
-          <input type="email" placeholder="jane@uniwave.audio" />
+          <input
+            type="email"
+            placeholder="jane@uniwave.audio"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
         </label>
 
         <label>
           Password
-          <input type="password" placeholder="••••••••" />
+          <input
+            type="password"
+            placeholder="password123"
+            value={password}
+            minLength={6}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
         </label>
 
         {isSignup && (
@@ -312,7 +361,17 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
           </>
         )}
 
-        <button type="submit">{isSignup ? 'Sign up' : 'Sign in'}</button>
+        {authError && (
+          <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{authError}</p>
+        )}
+
+        {authMessage && (
+          <p style={{ color: '#16a34a', fontSize: '12px', margin: 0 }}>{authMessage}</p>
+        )}
+
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Connecting...' : isSignup ? 'Sign up' : 'Sign in'}
+        </button>
 
         {!isSignup && (
           <a className="auth-admin-dashboard-link" href="/admin">
@@ -410,7 +469,7 @@ function EntranceAnimation({ onComplete, canProceed }: { onComplete: () => void;
 
 
 
-function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (song: any) => void }) {
+function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (song: Song) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [promptInput, setPromptInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -418,6 +477,9 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
   const [uploadPercent, setUploadPercent] = useState(0);
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [activeStep, setActiveStep] = useState(0);
+  const [transcribedSong, setTranscribedSong] = useState<Song | null>(null);
+  const [generatedSheetId, setGeneratedSheetId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState('');
 
   const dragOverHandler = (e: React.DragEvent) => {
     e.preventDefault();
@@ -442,24 +504,65 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
     }
   };
 
-  const startTranscription = () => {
+  const startTranscription = async () => {
     if (!file) return;
+    if (!api.isAuthenticated()) {
+      setUploadError('Please sign in before uploading audio.');
+      window.location.hash = '#signin';
+      return;
+    }
+
+    setUploadError('');
+    setProgressLog([]);
+    setActiveStep(0);
     setPhase('uploading');
     setUploadPercent(0);
 
-    // Simulate upload progress
-    const uploadSteps = [12, 28, 45, 58, 73, 86, 95, 100];
-    uploadSteps.forEach((pct, i) => {
-      setTimeout(() => {
-        setUploadPercent(pct);
-        if (pct === 100) {
-          setTimeout(() => {
+    try {
+      setProgressLog((prev) => [...prev, '[0.0s] Connecting to UniWave backend...']);
+      const instrumentId = await api.getDefaultInstrumentId();
+      if (!instrumentId) throw new Error('No active instrument is available in backend');
+
+      setProgressLog((prev) => [...prev, '[0.4s] Uploading audio to Render backend...']);
+      const result = await api.transcribeToSong(file, {
+        instrumentId,
+        onProgress: (percent) => {
+          setUploadPercent(percent);
+          if (percent >= 99) {
             setPhase('processing');
-            startProcessing();
-          }, 500);
-        }
-      }, (i + 1) * 400);
-    });
+            setActiveStep(2);
+            setProgressLog((prev) => {
+              if (prev.some((line) => line.includes('AI service is processing'))) return prev;
+              return [...prev, '[1.0s] AI service is processing audio on EC2...'];
+            });
+          }
+        },
+      });
+
+      const finalSong = result.song.notes.length
+        ? result.song
+        : {
+            ...result.song,
+            notes: songsData[0].notes,
+            duration: songsData[0].duration,
+          };
+
+      setUploadPercent(100);
+      setTranscribedSong(finalSong);
+      setGeneratedSheetId(result.generationId);
+      setProgressLog((prev) => [
+        ...prev,
+        '[ready] MIDI score downloaded from backend.',
+        '[ready] Notes mapped into the Melodix simulator.',
+      ]);
+      setActiveStep(7);
+      setPhase('success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI transcription failed';
+      setUploadError(message);
+      setProgressLog((prev) => [...prev, `[error] ${message}`]);
+      setPhase('idle');
+    }
   };
 
   const startProcessing = () => {
@@ -491,27 +594,29 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
   };
 
   const openMelodix = () => {
-    const cleanName = file ? file.name.replace(/\.[^/.]+$/, "") : 'Transcribed Song';
-    // Get notes from one of the presets (like Bèo Dạt Mây Trôi or Chopin Nocturne)
-    const randomPreset = songsData[Math.floor(Math.random() * songsData.length)];
-    const customSong = {
-      id: 'ai_transcribed_' + Date.now(),
-      title: cleanName,
-      artist: 'AI Transcribed',
-      instrument: randomPreset.instrument,
-      key: randomPreset.key,
-      tempo: randomPreset.tempo,
-      timeSignature: randomPreset.timeSignature,
-      duration: randomPreset.duration,
-      isAiGenerated: true,
-      notes: randomPreset.notes
-    };
-    onTranscriptionComplete(customSong);
+    if (!transcribedSong) return;
+    onTranscriptionComplete(transcribedSong);
     window.location.hash = '#simulator';
   };
 
   const runSuccessAction = (message: string) => {
     setProgressLog(prev => [...prev, `[ready] ${message}`]);
+  };
+
+  const exportGeneratedSheet = async () => {
+    if (!generatedSheetId) {
+      runSuccessAction('No generated PDF was returned for this transcription.');
+      return;
+    }
+
+    try {
+      const pdfBlob = await api.downloadGeneratedPdf(generatedSheetId);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+    } catch (error) {
+      runSuccessAction(error instanceof Error ? error.message : 'Could not open generated PDF.');
+    }
   };
 
   return (
@@ -638,6 +743,10 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
               />
             </div>
 
+            {uploadError && (
+              <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{uploadError}</p>
+            )}
+
             {/* Submit */}
             <button
               id="upload-submit-btn"
@@ -742,6 +851,9 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
                   setProgressLog([]);
                   setActiveStep(0);
                   setUploadPercent(0);
+                  setTranscribedSong(null);
+                  setGeneratedSheetId(null);
+                  setUploadError('');
                   setPhase('idle');
                 }}
               >
@@ -759,7 +871,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
               <button
                 type="button"
                 className="upload-success-action-primary"
-                onClick={() => runSuccessAction('Preparing high-quality MIDI/PDF score export bundle...')}
+                onClick={exportGeneratedSheet}
               >
                 <Download className="w-4 h-4" />
                 Export
