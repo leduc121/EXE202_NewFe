@@ -106,19 +106,12 @@ export function initializeAnalytics() {
   if (!GA_MEASUREMENT_ID || window.__uniwaveGaInitialized) return;
 
   window.dataLayer = window.dataLayer || [];
-  window.gtag = (...args: unknown[]) => {
-    window.dataLayer?.push(args);
-  };
+  window.gtag =
+    window.gtag ||
+    ((...args: unknown[]) => {
+      window.dataLayer?.push(args);
+    });
 
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`;
-  document.head.appendChild(script);
-
-  window.gtag('js', new Date());
-  window.gtag('config', GA_MEASUREMENT_ID, {
-    send_page_view: false,
-  });
   window.__uniwaveGaInitialized = true;
 }
 

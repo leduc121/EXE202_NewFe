@@ -64,6 +64,8 @@ interface User {
   role: string
   plan: string
   billing: string
+  source: string
+  campaign: string
   status: string
   joinedDate: string
   lastLogin: string
@@ -93,14 +95,16 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
   const [globalFilter, setGlobalFilter] = useState("")
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
+    switch (status.toLowerCase()) {
+      case "active":
         return "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20"
-      case "Pending":
+      case "pending":
         return "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20"
-      case "Error":
+      case "deleted":
+      case "error":
         return "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20"
-      case "Inactive":
+      case "inactive":
+      case "suspended":
         return "text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-900/20"
       default:
         return "text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-900/20"
@@ -108,16 +112,10 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
   }
 
   const getRoleColor = (role: string) => {
-    switch (role) {
-      case "Admin":
+    switch (role.toLowerCase()) {
+      case "admin":
         return "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20"
-      case "Editor":
-        return "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20"
-      case "Author":
-        return "text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-900/20"
-      case "Maintainer":
-        return "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20"
-      case "Subscriber":
+      case "user":
         return "text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20"
       default:
         return "text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-900/20"
@@ -204,6 +202,20 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
       cell: ({ row }) => {
         const billing = row.getValue("billing") as string
         return <span className="text-sm">{billing}</span>
+      },
+    },
+    {
+      accessorKey: "source",
+      header: "Source",
+      cell: ({ row }) => {
+        const source = row.getValue("source") as string
+        const campaign = row.original.campaign
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{source}</span>
+            <span className="text-xs text-muted-foreground">{campaign}</span>
+          </div>
+        )
       },
     },
     {
@@ -337,11 +349,8 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="Admin">Admin</SelectItem>
-              <SelectItem value="Author">Author</SelectItem>
-              <SelectItem value="Editor">Editor</SelectItem>
-              <SelectItem value="Maintainer">Maintainer</SelectItem>
-              <SelectItem value="Subscriber">Subscriber</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="user">User</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -360,9 +369,9 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Plans</SelectItem>
-              <SelectItem value="Basic">Basic</SelectItem>
-              <SelectItem value="Professional">Professional</SelectItem>
-              <SelectItem value="Enterprise">Enterprise</SelectItem>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -381,10 +390,9 @@ export function DataTable({ users, onDeleteUser, onEditUser, onAddUser }: DataTa
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Error">Error</SelectItem>
-              <SelectItem value="Inactive">Inactive</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
+              <SelectItem value="deleted">Deleted</SelectItem>
             </SelectContent>
           </Select>
         </div>

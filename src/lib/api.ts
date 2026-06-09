@@ -6,6 +6,7 @@ const AI_BASE_URL = (import.meta.env.VITE_AI_API_URL || 'http://47.129.211.133')
 
 const ACCESS_TOKEN_KEYS = ['access_token', 'accessToken', 'token'];
 const REFRESH_TOKEN_KEYS = ['refresh_token', 'refreshToken'];
+const CURRENT_USER_KEY = 'uniwave_current_user';
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -20,8 +21,24 @@ export type Instrument = {
   slug?: string;
 };
 
+export type CurrentUser = {
+  id: string;
+  fullName: string;
+  displayName?: string | null;
+  email: string;
+  role: string;
+  status: string;
+  subscription: string;
+  avatarUrl?: string | null;
+  emailVerified?: boolean;
+  authProvider?: string;
+  mustSetPassword?: boolean;
+  createdAt?: string;
+  lastLoginAt?: string | null;
+};
+
 export type AuthResponse = {
-  user: unknown;
+  user: CurrentUser;
   access_token: string;
   refresh_token: string;
 };
@@ -109,6 +126,12 @@ export type AdminUser = {
   subscription: string;
   createdAt: string;
   lastLoginAt: string | null;
+  attribution?: {
+    source: string;
+    medium: string;
+    campaign: string;
+    landingPage: string | null;
+  } | null;
 };
 
 export type AudioUploadResponse = {
@@ -140,10 +163,21 @@ function persistAuthTokens(auth: AuthResponse) {
   localStorage.setItem('token', auth.access_token);
   localStorage.setItem('refresh_token', auth.refresh_token);
   localStorage.setItem('refreshToken', auth.refresh_token);
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(auth.user));
 }
 
 function clearAuthTokens() {
   [...ACCESS_TOKEN_KEYS, ...REFRESH_TOKEN_KEYS].forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function readStoredCurrentUser() {
+  try {
+    const raw = localStorage.getItem(CURRENT_USER_KEY);
+    return raw ? (JSON.parse(raw) as CurrentUser) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function unwrapResponse<T>(response: Response): Promise<T> {
@@ -155,7 +189,7 @@ async function unwrapResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const message =
       payload?.message ||
-      payload?.error ||
+      (typeof payload?.error === 'object' ? payload.error?.message || payload.error?.error : payload?.error) ||
       (typeof payload === 'string' && payload) ||
       response.statusText ||
       'API request failed';
@@ -227,6 +261,8 @@ export const api = {
   apiBaseUrl: API_BASE_URL,
   aiBaseUrl: AI_BASE_URL,
   isAuthenticated: () => Boolean(getStoredToken()),
+  getStoredCurrentUser: readStoredCurrentUser,
+  isStoredAdmin: () => readStoredCurrentUser()?.role === 'admin',
   logout: clearAuthTokens,
 
   async register(
@@ -275,6 +311,12 @@ export const api = {
 
   async getInstruments() {
     return apiFetch<Instrument[]>('/instruments');
+  },
+
+  async getCurrentUser() {
+    const user = await apiFetch<CurrentUser>('/users/me');
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    return user;
   },
 
   async getAdminSummary() {

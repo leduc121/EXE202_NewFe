@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
-import { api } from './lib/api';
+import { api, type CurrentUser } from './lib/api';
 import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackPageView } from './lib/analytics';
 import type { Song } from './melo/types';
 
@@ -384,13 +384,6 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
         <button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Connecting...' : isSignup ? 'Sign up' : 'Sign in'}
         </button>
-
-        {!isSignup && (
-          <a className="auth-admin-dashboard-link" href="#admin">
-            Admin Dashboard
-            <ArrowUpRight className="h-4 w-4" />
-          </a>
-        )}
 
         <p className="auth-switch">
           {isSignup ? 'Already have an account?' : "Don't have an account?"}
@@ -1054,7 +1047,9 @@ export default function App() {
   const [introFinished, setIntroFinished] = useState(false);
   const [mainContentReady, setMainContentReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => api.isAuthenticated());
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => api.getStoredCurrentUser());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const isAdmin = currentUser?.role === 'admin';
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoBgRef = useRef<HTMLDivElement>(null);
@@ -1073,19 +1068,55 @@ export default function App() {
   }, [pageView]);
 
   useEffect(() => {
-    const syncAuthState = () => setIsLoggedIn(api.isAuthenticated());
+    let cancelled = false;
+    const syncAuthState = async () => {
+      const authenticated = api.isAuthenticated();
+      setIsLoggedIn(authenticated);
+
+      if (!authenticated) {
+        setCurrentUser(null);
+        return;
+      }
+
+      const storedUser = api.getStoredCurrentUser();
+      if (storedUser) setCurrentUser(storedUser);
+
+      try {
+        const user = await api.getCurrentUser();
+        if (!cancelled) setCurrentUser(user);
+      } catch {
+        if (!cancelled) setCurrentUser(storedUser);
+      }
+    };
+
     window.addEventListener('storage', syncAuthState);
     window.addEventListener('uniwave-auth-change', syncAuthState);
+    syncAuthState();
+
     return () => {
+      cancelled = true;
       window.removeEventListener('storage', syncAuthState);
       window.removeEventListener('uniwave-auth-change', syncAuthState);
     };
   }, []);
 
+  useEffect(() => {
+    if (pageView !== 'admin') return;
+    if (!isLoggedIn) {
+      window.location.hash = '#signin';
+      return;
+    }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      window.location.hash = '#home';
+    }
+  }, [pageView, isLoggedIn, currentUser]);
+
   const handleSignOut = () => {
     trackEvent('logout');
     api.logout();
     setIsLoggedIn(false);
+    setCurrentUser(null);
     setIsUserMenuOpen(false);
     setTranscribedSong(null);
     window.dispatchEvent(new Event('uniwave-auth-change'));
@@ -1340,6 +1371,16 @@ export default function App() {
                           <Upload className="h-4 w-4" />
                           Upload
                         </a>
+                        {isAdmin && (
+                          <a
+                            href="#admin"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            Dashboard
+                          </a>
+                        )}
                         <button
                           type="button"
                           onClick={() => setIsUserMenuOpen(false)}

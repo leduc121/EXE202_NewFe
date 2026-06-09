@@ -14,6 +14,8 @@ interface User {
   role: string
   plan: string
   billing: string
+  source: string
+  campaign: string
   status: string
   joinedDate: string
   lastLogin: string
@@ -56,6 +58,10 @@ export default function UsersPage() {
           role: user.role,
           plan: user.subscription,
           billing: "Account",
+          source: user.attribution
+            ? `${user.attribution.source} / ${user.attribution.medium}`
+            : "direct / none",
+          campaign: user.attribution?.campaign || "not_set",
           status: user.status,
           joinedDate: user.createdAt?.split("T")[0] || "",
           lastLogin: user.lastLoginAt?.split("T")[0] || "Never",
@@ -94,6 +100,8 @@ export default function UsersPage() {
       role: userData.role,
       plan: userData.plan,
       billing: userData.billing,
+      source: "manual / admin",
+      campaign: "not_set",
       status: userData.status,
       joinedDate: new Date().toISOString().split('T')[0],
       lastLogin: new Date().toISOString().split('T')[0],
