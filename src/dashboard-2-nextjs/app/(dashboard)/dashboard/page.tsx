@@ -1,3 +1,5 @@
+"use client"
+
 import { MetricsOverview } from "./components/metrics-overview"
 import { SalesChart } from "./components/sales-chart"
 import { RecentTransactions } from "./components/recent-transactions"
@@ -5,8 +7,11 @@ import { TopProducts } from "./components/top-products"
 import { CustomerInsights } from "./components/customer-insights"
 import { QuickActions } from "./components/quick-actions"
 import { RevenueBreakdown } from "./components/revenue-breakdown"
+import { useAdminDashboardData } from "@/hooks/use-admin-dashboard-data"
 
 export default function Dashboard2() {
+  const dashboard = useAdminDashboardData()
+
   return (
     <div className="flex-1 space-y-6 px-6 pt-0">
         {/* Enhanced Header */}
@@ -25,17 +30,17 @@ export default function Dashboard2() {
         <div className="@container/main space-y-6">
           {/* Top Row - Key Metrics */}
 
-          <MetricsOverview />
+          <MetricsOverview summary={dashboard.summary} financials={dashboard.financials} isLoading={dashboard.isLoading} />
 
           {/* Second Row - Charts in 6-6 columns */}
           <div className="grid gap-6 grid-cols-1 @5xl:grid-cols-2">
-            <SalesChart />
-            <RevenueBreakdown />
+            <SalesChart financials={dashboard.financials} />
+            <RevenueBreakdown attribution={dashboard.attribution} />
           </div>
 
           {/* Third Row - Two Column Layout */}
           <div className="grid gap-6 grid-cols-1 @5xl:grid-cols-2">
-            <RecentTransactions />
+            <RecentTransactions transactions={dashboard.transactions} isLoading={dashboard.isLoading} />
             <TopProducts />
           </div>
 

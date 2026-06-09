@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Song } from '../types';
 
 interface SheetMusicProps {
@@ -28,7 +28,7 @@ const getKeySignatureSharps = (songKey: string) => {
 
 export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusicProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isPaperTheme, setIsPaperTheme] = useState<boolean>(true);
+  const isPaperTheme = true;
 
   // Divide song duration across 3 beautiful staves
   const staffRanges = useMemo(() => {
@@ -89,33 +89,6 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
       ) : (
         <div className="absolute inset-0 border border-amber-500/5 rounded-2xl pointer-events-none"></div>
       )}
-
-      {/* Sheet details panel header */}
-      <div className="flex items-center justify-between mb-4 px-2">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${isPaperTheme ? 'bg-[#c2410c] animate-pulse' : 'bg-[#ffad4d] animate-ping'}`}></span>
-          <span className={`text-xs font-bold tracking-widest font-sans ${isPaperTheme ? 'text-stone-500' : 'text-[#5c6b84]'}`}>
-            {song.isAiGenerated ? 'AI SPECTRUM SHEET TRANSCRIBED' : 'INTERACTIVE SCORE READER'}
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className={`text-xs font-mono ${isPaperTheme ? 'text-stone-500' : 'text-[#4e5e78]'} flex items-center gap-2`}>
-            <span>Notation: Classic</span>
-            <span className={`w-1.5 h-1.5 rounded-full ${isPaperTheme ? 'bg-stone-300' : 'bg-[#1b2a41]'}`}></span>
-            <span>Autoscroll: On</span>
-          </div>
-          <button
-            onClick={() => setIsPaperTheme(!isPaperTheme)}
-            className={`px-3 py-1 rounded-lg text-[10px] font-bold font-sans cursor-pointer transition-all border ${
-              isPaperTheme
-                ? 'bg-[#121c2a] border-[#18283e] text-amber-200 hover:bg-[#1a2b41]'
-                : 'bg-[#faf8f4] border-[#e8e5dc] text-stone-800 hover:bg-stone-100'
-            }`}
-          >
-            {isPaperTheme ? 'Switch to Dark Synth' : 'Switch to Classic Paper'}
-          </button>
-        </div>
-      </div>
 
       {/* SVG Canvas for drawing score */}
       <div 

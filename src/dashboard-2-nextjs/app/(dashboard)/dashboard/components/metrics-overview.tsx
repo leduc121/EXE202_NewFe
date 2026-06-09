@@ -10,51 +10,68 @@ import {
 } from "lucide-react"
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import type { AdminSummary, FinancialOverview } from "../../../../../lib/api"
 
-const metrics = [
-  {
-    title: "Total Revenue",
-    value: "$54,230",
-    description: "Monthly revenue",
-    change: "+12%",
-    trend: "up",
-    icon: DollarSign,
-    footer: "Trending up this month",
-    subfooter: "Revenue for the last 6 months"
-  },
-  {
-    title: "Active Customers",
-    value: "2,350",
-    description: "Total active users",
-    change: "+5.2%", 
-    trend: "up",
-    icon: Users,
-    footer: "Strong user retention",
-    subfooter: "Engagement exceeds targets"
-  },
-  {
-    title: "Total Orders",
-    value: "1,247",
-    description: "Orders this month",
-    change: "-2.1%",
-    trend: "down", 
-    icon: ShoppingCart,
-    footer: "Down 2% this period",
-    subfooter: "Order volume needs attention"
-  },
-  {
-    title: "Conversion Rate",
-    value: "3.24%",
-    description: "Average conversion",
-    change: "+8.3%",
-    trend: "up",
-    icon: BarChart3,
-    footer: "Steady performance increase",
-    subfooter: "Meets conversion projections"
-  },
-]
+function formatVnd(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value || 0)
+}
 
-export function MetricsOverview() {
+export function MetricsOverview({
+  summary,
+  financials,
+  isLoading,
+}: {
+  summary: AdminSummary | null
+  financials: FinancialOverview | null
+  isLoading: boolean
+}) {
+  const metrics = [
+    {
+      title: "Total Revenue",
+      value: isLoading ? "Loading..." : formatVnd(summary?.totalRevenue || 0),
+      description: "Successful payments",
+      change: `${financials?.cards.refundRate || 0}% refund`,
+      trend: "up",
+      icon: DollarSign,
+      footer: "Revenue from completed payments",
+      subfooter: "Calculated from backend payment records"
+    },
+    {
+      title: "Active Users",
+      value: isLoading ? "Loading..." : (summary?.activeUsers || 0).toLocaleString(),
+      description: "Currently active accounts",
+      change: `${summary?.totalUsers || 0} total`,
+      trend: "up",
+      icon: Users,
+      footer: "Registered user base",
+      subfooter: `${summary?.freeUsers || 0} free / ${summary?.paidUsers || 0} paid`
+    },
+    {
+      title: "Uploads",
+      value: isLoading ? "Loading..." : (summary?.uploadsCount || 0).toLocaleString(),
+      description: "Audio uploads",
+      change: `${summary?.completedGenerations || 0} done`,
+      trend: "up",
+      icon: ShoppingCart,
+      footer: "AI transcription activity",
+      subfooter: `${summary?.failedGenerations || 0} failed generations`
+    },
+    {
+      title: "Subscriptions",
+      value: isLoading ? "Loading..." : (summary?.activeSubscriptions || 0).toLocaleString(),
+      description: "Active subscriptions",
+      change: `${summary?.successfulPayments || 0} paid`,
+      trend: "up",
+      icon: BarChart3,
+      footer: "Plan conversion signal",
+      subfooter: `${summary?.paymentsCount || 0} total payment attempts`
+    },
+  ]
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs grid gap-4 sm:grid-cols-2 @5xl:grid-cols-4">
       {metrics.map((metric) => {

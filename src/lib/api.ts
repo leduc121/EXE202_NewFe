@@ -26,6 +26,91 @@ export type AuthResponse = {
   refresh_token: string;
 };
 
+export type MarketingAttributionPayload = {
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  landing_page?: string;
+  referrer?: string;
+  gclid?: string;
+  fbclid?: string;
+  ttclid?: string;
+  msclkid?: string;
+};
+
+export type AdminSummary = {
+  totalUsers: number;
+  activeUsers: number;
+  freeUsers: number;
+  paidUsers: number;
+  activeSubscriptions: number;
+  paymentsCount: number;
+  successfulPayments: number;
+  totalRevenue: number;
+  uploadsCount: number;
+  aiJobsCount: number;
+  completedGenerations: number;
+  failedGenerations: number;
+};
+
+export type FinancialOverview = {
+  range: string;
+  revenueOverview: {
+    totalRevenue: number;
+    monthly: Array<{ month: string; label: string; revenue: number }>;
+  };
+  costsBreakdown: {
+    totalCosts: number;
+    monthly: Array<{
+      month: string;
+      label: string;
+      cogs: number;
+      operatingExpenses: number;
+      totalCosts: number;
+    }>;
+  };
+  cards: {
+    grossRevenue: number;
+    netProfit: number;
+    refundRate: number;
+    avgTransaction: number;
+  };
+};
+
+export type MarketingAttributionSummary = {
+  campaigns: Array<{ source: string; medium: string; campaign: string; users: number }>;
+  sources: Array<{ source: string; users: number }>;
+};
+
+export type AdminTransaction = {
+  id: string;
+  transactionId: string;
+  customerName: string;
+  customerEmail: string | null;
+  amount: number;
+  currency: string;
+  type: string;
+  paymentMethod: string;
+  status: string;
+  planName: string | null;
+  date: string;
+  checkoutUrl?: string | null;
+  createdAt: string;
+};
+
+export type AdminUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+  subscription: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+};
+
 export type AudioUploadResponse = {
   id: string;
   originalFilename: string;
@@ -102,6 +187,11 @@ async function apiFetch<T>(path: string, init: RequestInit = {}) {
   return unwrapResponse<T>(response);
 }
 
+function isNonWhitelistedAttributionError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes('property attribution should not exist');
+}
+
 function uploadWithProgress<T>(
   path: string,
   formData: FormData,
@@ -139,24 +229,76 @@ export const api = {
   isAuthenticated: () => Boolean(getStoredToken()),
   logout: clearAuthTokens,
 
-  async register(fullName: string, email: string, password: string) {
-    return apiFetch<{ success: boolean; email: string }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ fullName, email, password }),
-    });
+  async register(
+    fullName: string,
+    email: string,
+    password: string,
+    attribution?: MarketingAttributionPayload,
+  ) {
+    const payload = { fullName, email, password, attribution };
+
+    try {
+      return await apiFetch<{ success: boolean; email: string }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      if (!attribution || !isNonWhitelistedAttributionError(error)) throw error;
+
+      return apiFetch<{ success: boolean; email: string }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ fullName, email, password }),
+      });
+    }
   },
 
-  async login(email: string, password: string) {
-    const auth = await apiFetch<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  async login(email: string, password: string, attribution?: MarketingAttributionPayload) {
+    let auth: AuthResponse;
+
+    try {
+      auth = await apiFetch<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, attribution }),
+      });
+    } catch (error) {
+      if (!attribution || !isNonWhitelistedAttributionError(error)) throw error;
+
+      auth = await apiFetch<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+    }
+
     persistAuthTokens(auth);
     return auth;
   },
 
   async getInstruments() {
     return apiFetch<Instrument[]>('/instruments');
+  },
+
+  async getAdminSummary() {
+    return apiFetch<AdminSummary>('/dashboard/admin/summary');
+  },
+
+  async getAdminFinancials(range = '1y') {
+    return apiFetch<FinancialOverview>(`/dashboard/admin/financials?range=${encodeURIComponent(range)}`);
+  },
+
+  async getAdminMarketingAttribution(limit = 8) {
+    return apiFetch<MarketingAttributionSummary>(
+      `/dashboard/admin/marketing-attribution?limit=${encodeURIComponent(String(limit))}`,
+    );
+  },
+
+  async getAdminTransactions(limit = 5) {
+    return apiFetch<{ items: AdminTransaction[]; pagination: unknown }>(
+      `/payments/admin/transactions?limit=${encodeURIComponent(String(limit))}`,
+    );
+  },
+
+  async getAdminUsers() {
+    return apiFetch<AdminUser[]>('/users');
   },
 
   async getDefaultInstrumentId() {

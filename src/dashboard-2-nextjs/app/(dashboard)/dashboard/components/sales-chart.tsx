@@ -6,42 +6,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-
-const salesData = [
-  { month: "Jan", sales: 12500, target: 15000 },
-  { month: "Feb", sales: 18200, target: 15000 },
-  { month: "Mar", sales: 16800, target: 15000 },
-  { month: "Apr", sales: 22400, target: 20000 },
-  { month: "May", sales: 24600, target: 20000 },
-  { month: "Jun", sales: 28200, target: 25000 },
-  { month: "Jul", sales: 31500, target: 25000 },
-  { month: "Aug", sales: 29800, target: 25000 },
-  { month: "Sep", sales: 33200, target: 30000 },
-  { month: "Oct", sales: 35100, target: 30000 },
-  { month: "Nov", sales: 38900, target: 35000 },
-  { month: "Dec", sales: 42300, target: 35000 },
-]
+import type { FinancialOverview } from "../../../../../lib/api"
 
 const chartConfig = {
-  sales: {
-    label: "Sales",
+  revenue: {
+    label: "Revenue",
     color: "var(--primary)",
   },
-  target: {
-    label: "Target",
+  costs: {
+    label: "Costs",
     color: "var(--primary)",
   },
 }
 
-export function SalesChart() {
+export function SalesChart({ financials }: { financials: FinancialOverview | null }) {
   const [timeRange, setTimeRange] = useState("12m")
+  const chartData = financials?.revenueOverview.monthly.map((item) => {
+    const cost = financials.costsBreakdown.monthly.find((row) => row.month === item.month)
+    return {
+      month: item.label,
+      revenue: item.revenue,
+      costs: cost?.totalCosts || 0,
+    }
+  }) || []
 
   return (
     <Card className="cursor-pointer">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle>Sales Performance</CardTitle>
-          <CardDescription>Monthly sales vs targets</CardDescription>
+          <CardTitle>Revenue Performance</CardTitle>
+          <CardDescription>Monthly revenue and estimated costs</CardDescription>
         </div>
         <div className="flex items-center space-x-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -62,15 +56,15 @@ export function SalesChart() {
       <CardContent className="p-0 pt-6">
         <div className="px-6 pb-6">
           <ChartContainer config={chartConfig} className="h-[350px] w-full">
-            <AreaChart data={salesData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <defs>
-                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-sales)" stopOpacity={0.05} />
+                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-target)" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="var(--color-target)" stopOpacity={0} />
+                <linearGradient id="colorCosts" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-costs)" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="var(--color-costs)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
@@ -86,24 +80,24 @@ export function SalesChart() {
                 tickLine={false}
                 className="text-xs"
                 tick={{ fontSize: 12 }}
-                tickFormatter={(value) => `$${value.toLocaleString()}`}
+                tickFormatter={(value) => `${Number(value).toLocaleString("vi-VN")}`}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area
                 type="monotone"
-                dataKey="target"
+                dataKey="costs"
                 stackId="1"
-                stroke="var(--color-target)"
-                fill="url(#colorTarget)"
+                stroke="var(--color-costs)"
+                fill="url(#colorCosts)"
                 strokeDasharray="5 5"
                 strokeWidth={1}
               />
               <Area
                 type="monotone"
-                dataKey="sales"
+                dataKey="revenue"
                 stackId="2"
-                stroke="var(--color-sales)"
-                fill="url(#colorSales)"
+                stroke="var(--color-revenue)"
+                fill="url(#colorRevenue)"
                 strokeWidth={1}
               />
             </AreaChart>

@@ -2,40 +2,46 @@ import { Card, CardContent } from "@/components/ui/card"
 import {Users, CreditCard, UserCheck, Clock5, TrendingUp, TrendingDown, ArrowUpRight} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from '@/lib/utils'
+import type { AdminSummary } from "../../../../../lib/api"
 
+export function StatCards({
+  summary,
+  isLoading,
+}: {
+  summary: AdminSummary | null
+  isLoading: boolean
+}) {
+  const performanceMetrics = [
+    {
+      title: 'Total Users',
+      current: isLoading ? 'Loading...' : (summary?.totalUsers || 0).toLocaleString(),
+      previous: 'registered accounts',
+      growth: 0,
+      icon: Users,
+    },
+    {
+      title: 'Paid Users',
+      current: isLoading ? 'Loading...' : (summary?.paidUsers || 0).toLocaleString(),
+      previous: `${summary?.freeUsers || 0} free users`,
+      growth: 0,
+      icon: CreditCard,
+    },
+    {
+      title: 'Active Users',
+      current: isLoading ? 'Loading...' : (summary?.activeUsers || 0).toLocaleString(),
+      previous: 'active accounts',
+      growth: 0,
+      icon: UserCheck,
+    },
+    {
+      title: 'Subscriptions',
+      current: isLoading ? 'Loading...' : (summary?.activeSubscriptions || 0).toLocaleString(),
+      previous: 'active subscriptions',
+      growth: 0,
+      icon: Clock5,
+    },
+  ]
 
-const performanceMetrics = [
-  {
-    title: 'Total Users',
-    current: '$2.4M',
-    previous: '$1.8M',
-    growth: 33.3,
-    icon: Users,
-  },
-  {
-    title: 'Paid Users',
-    current: '12.5K',
-    previous: '9.2K',
-    growth: 35.9,
-    icon: CreditCard,
-  },
-  {
-    title: 'Active Users',
-    current: '8.9k',
-    previous: '6.7k',
-    growth: 32.8,
-    icon: UserCheck,
-  },
-  {
-    title: 'Pending Users',
-    current: '17%',
-    previous: '24%',
-    growth: -8.0,
-    icon: Clock5,
-  },
-]
-
-export function StatCards() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {performanceMetrics.map((metric, index) => (
@@ -70,7 +76,7 @@ export function StatCards() {
               <p className='text-muted-foreground text-sm font-medium'>{metric.title}</p>
               <div className='text-2xl font-bold'>{metric.current}</div>
               <div className='text-muted-foreground flex items-center gap-2 text-sm'>
-                <span>from {metric.previous}</span>
+                <span>{metric.previous}</span>
                 <ArrowUpRight className='size-3' />
               </div>
             </div>

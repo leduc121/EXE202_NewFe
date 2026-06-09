@@ -7,57 +7,60 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartStyle, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-
-const revenueData = [
-  { category: "subscriptions", value: 45, amount: 24500, fill: "var(--color-subscriptions)" },
-  { category: "sales", value: 30, amount: 16300, fill: "var(--color-sales)" },
-  { category: "services", value: 15, amount: 8150, fill: "var(--color-services)" },
-  { category: "partnerships", value: 10, amount: 5430, fill: "var(--color-partnerships)" },
-]
+import type { MarketingAttributionSummary } from "../../../../../lib/api"
 
 const chartConfig = {
-  revenue: {
-    label: "Revenue",
+  users: {
+    label: "Users",
   },
-  amount: {
-    label: "Amount",
-  },
-  subscriptions: {
-    label: "Subscriptions",
+  source1: {
+    label: "Source 1",
     color: "var(--chart-1)",
   },
-  sales: {
-    label: "One-time Sales",
+  source2: {
+    label: "Source 2",
     color: "var(--chart-2)",
   },
-  services: {
-    label: "Services",
+  source3: {
+    label: "Source 3",
     color: "var(--chart-3)",
   },
-  partnerships: {
-    label: "Partnerships",
+  source4: {
+    label: "Source 4",
     color: "var(--chart-4)",
   },
 }
 
-export function RevenueBreakdown() {
-  const id = "revenue-breakdown"
-  const [activeCategory, setActiveCategory] = React.useState("sales")
+export function RevenueBreakdown({ attribution }: { attribution: MarketingAttributionSummary | null }) {
+  const id = "marketing-attribution"
+  const attributionData = React.useMemo(() => {
+    const total = attribution?.sources.reduce((sum, item) => sum + item.users, 0) || 0
+    return (attribution?.sources || []).slice(0, 4).map((item, index) => ({
+      category: `source${index + 1}`,
+      label: item.source,
+      users: item.users,
+      value: total ? Math.round((item.users / total) * 100) : 0,
+      fill: `var(--color-source${index + 1})`,
+    }))
+  }, [attribution])
+  const hasAttribution = attributionData.length > 0
+
+  const [activeCategory, setActiveCategory] = React.useState("source1")
 
   const activeIndex = React.useMemo(() => {
-    const index = revenueData.findIndex((item) => item.category === activeCategory)
+    const index = attributionData.findIndex((item) => item.category === activeCategory)
     return index === -1 ? 0 : index
-  }, [activeCategory])
+  }, [activeCategory, attributionData])
 
-  const categories = React.useMemo(() => revenueData.map((item) => item.category), [])
+  const categories = React.useMemo(() => attributionData.map((item) => item.category), [attributionData])
 
   return (
     <Card data-chart={id} className="flex flex-col cursor-pointer">
       <ChartStyle id={id} config={chartConfig} />
       <CardHeader className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 pb-2">
         <div>
-          <CardTitle>Revenue Breakdown</CardTitle>
-          <CardDescription>Revenue distribution by source</CardDescription>
+          <CardTitle>Marketing Attribution</CardTitle>
+          <CardDescription>First-touch users by UTM source</CardDescription>
         </div>
         <div className="flex items-center space-x-2">
           <Select value={activeCategory} onValueChange={setActiveCategory}>
@@ -88,7 +91,7 @@ export function RevenueBreakdown() {
                           backgroundColor: `var(--color-${key})`,
                         }}
                       />
-                      {config?.label}
+                      {attributionData.find((item) => item.category === key)?.label || config?.label}
                     </div>
                   </SelectItem>
                 )
@@ -101,6 +104,11 @@ export function RevenueBreakdown() {
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 justify-center">
+        {!hasAttribution ? (
+          <div className="flex min-h-[300px] w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+            No attribution data yet. New signups with UTM links will appear here after the backend is deployed.
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
           <div className="flex justify-center">
             <ChartContainer
@@ -114,8 +122,8 @@ export function RevenueBreakdown() {
                   content={<ChartTooltipContent hideLabel />}
                 />
                 <Pie
-                  data={revenueData}
-                  dataKey="amount"
+                  data={attributionData}
+                  dataKey="users"
                   nameKey="category"
                   innerRadius={60}
                   strokeWidth={5}
@@ -148,14 +156,14 @@ export function RevenueBreakdown() {
                               y={viewBox.cy}
                               className="fill-foreground text-3xl font-bold"
                             >
-                              ${(revenueData[activeIndex].amount / 1000).toFixed(0)}K
+                              {attributionData[activeIndex].users}
                             </tspan>
                             <tspan
                               x={viewBox.cx}
                               y={(viewBox.cy || 0) + 24}
                               className="fill-muted-foreground"
                             >
-                              Revenue
+                              Users
                             </tspan>
                           </text>
                         )
@@ -168,7 +176,7 @@ export function RevenueBreakdown() {
           </div>
 
           <div className="flex flex-col justify-center space-y-4">
-            {revenueData.map((item, index) => {
+            {attributionData.map((item, index) => {
               const config = chartConfig[item.category as keyof typeof chartConfig]
               const isActive = index === activeIndex
 
@@ -187,10 +195,10 @@ export function RevenueBreakdown() {
                         backgroundColor: `var(--color-${item.category})`,
                       }}
                     />
-                    <span className="font-medium">{config?.label}</span>
+                    <span className="font-medium">{item.label || config?.label}</span>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold">${(item.amount / 1000).toFixed(1)}K</div>
+                    <div className="font-bold">{item.users.toLocaleString()} users</div>
                     <div className="text-sm text-muted-foreground">{item.value}%</div>
                   </div>
                 </div>
@@ -198,6 +206,7 @@ export function RevenueBreakdown() {
             })}
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
 import { api } from './lib/api';
+import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackPageView } from './lib/analytics';
 import type { Song } from './melo/types';
 
 
@@ -134,7 +135,7 @@ type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator
 
 const getPageFromHash = (): PageView => {
   if (typeof window === 'undefined') return 'home';
-  if (window.location.pathname === '/admin') return 'admin';
+  if (window.location.pathname.endsWith('/admin')) return 'admin';
   const hash = window.location.hash.replace('#', '');
   if (hash.startsWith('admin')) return 'admin';
   if (hash === 'signup' || hash === 'signin' || hash === 'contact' || hash === 'upload' || hash === 'simulator') return hash;
@@ -262,18 +263,29 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
     setAuthError('');
     setAuthMessage('');
     setIsSubmitting(true);
+    trackEvent('auth_submit', { method: 'email', auth_mode: mode });
 
     try {
       if (isSignup) {
-        await api.register(fullName.trim() || email.split('@')[0], email.trim(), password);
+        await api.register(
+          fullName.trim() || email.split('@')[0],
+          email.trim(),
+          password,
+          getMarketingAttributionPayload(),
+        );
         setAuthMessage('Account created. Signing you in...');
+        trackEvent('sign_up', { method: 'email' });
       }
 
-      await api.login(email.trim(), password);
+      await api.login(email.trim(), password, getMarketingAttributionPayload());
+      trackEvent('login', { method: 'email' });
+      window.dispatchEvent(new Event('uniwave-auth-change'));
       setAuthMessage('Signed in successfully.');
       window.location.hash = '#upload';
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
+      const message = error instanceof Error ? error.message : 'Authentication failed';
+      trackEvent('auth_error', { method: 'email', auth_mode: mode, error_message: message });
+      setAuthError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -374,7 +386,7 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
         </button>
 
         {!isSignup && (
-          <a className="auth-admin-dashboard-link" href="/admin">
+          <a className="auth-admin-dashboard-link" href="#admin">
             Admin Dashboard
             <ArrowUpRight className="h-4 w-4" />
           </a>
@@ -507,6 +519,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
   const startTranscription = async () => {
     if (!file) return;
     if (!api.isAuthenticated()) {
+      trackEvent('login_required', { feature: 'audio_upload' });
       setUploadError('Please sign in before uploading audio.');
       window.location.hash = '#signin';
       return;
@@ -517,6 +530,10 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
     setActiveStep(0);
     setPhase('uploading');
     setUploadPercent(0);
+    trackEvent('audio_upload_start', {
+      file_type: file.type || 'unknown',
+      file_size_mb: Number((file.size / 1024 / 1024).toFixed(2)),
+    });
 
     try {
       setProgressLog((prev) => [...prev, '[0.0s] Connecting to UniWave backend...']);
@@ -557,8 +574,14 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       ]);
       setActiveStep(7);
       setPhase('success');
+      trackEvent('audio_transcription_complete', {
+        generation_id: result.generationId,
+        instrument_name: result.upload.instrument?.name || 'unknown',
+        note_count: finalSong.notes.length,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI transcription failed';
+      trackEvent('audio_transcription_error', { error_message: message });
       setUploadError(message);
       setProgressLog((prev) => [...prev, `[error] ${message}`]);
       setPhase('idle');
@@ -595,6 +618,10 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
 
   const openMelodix = () => {
     if (!transcribedSong) return;
+    trackEvent('open_simulator', {
+      event_source: 'audio_upload_success',
+      song_title: transcribedSong.title,
+    });
     onTranscriptionComplete(transcribedSong);
     window.location.hash = '#simulator';
   };
@@ -613,6 +640,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       const pdfBlob = await api.downloadGeneratedPdf(generatedSheetId);
       const objectUrl = URL.createObjectURL(pdfBlob);
       window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      trackEvent('download_generated_sheet', { generation_id: generatedSheetId, file_type: 'pdf' });
       setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
     } catch (error) {
       runSuccessAction(error instanceof Error ? error.message : 'Could not open generated PDF.');
@@ -1025,6 +1053,8 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [introFinished, setIntroFinished] = useState(false);
   const [mainContentReady, setMainContentReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => api.isAuthenticated());
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoBgRef = useRef<HTMLDivElement>(null);
@@ -1032,10 +1062,35 @@ export default function App() {
   const titleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    initializeAnalytics();
     const handleHashChange = () => setPageView(getPageFromHash());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    trackPageView(pageView);
+  }, [pageView]);
+
+  useEffect(() => {
+    const syncAuthState = () => setIsLoggedIn(api.isAuthenticated());
+    window.addEventListener('storage', syncAuthState);
+    window.addEventListener('uniwave-auth-change', syncAuthState);
+    return () => {
+      window.removeEventListener('storage', syncAuthState);
+      window.removeEventListener('uniwave-auth-change', syncAuthState);
+    };
+  }, []);
+
+  const handleSignOut = () => {
+    trackEvent('logout');
+    api.logout();
+    setIsLoggedIn(false);
+    setIsUserMenuOpen(false);
+    setTranscribedSong(null);
+    window.dispatchEvent(new Event('uniwave-auth-change'));
+    window.location.hash = '#home';
+  };
 
   useEffect(() => {
     if (!introFinished) return;
@@ -1257,23 +1312,73 @@ export default function App() {
 
               <div 
                 id="nav-auth-cluster"
-                className="flex items-center gap-3 ml-4"
+                className="relative flex items-center gap-3 ml-4"
               >
-                <a 
-                  id="nav-signin-link"
-                  href="#signin" 
-                  className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
-                >
-                  Sign in
-                </a>
-                <a 
-                  id="nav-tryfree-button"
-                  href="#signup" 
-                  className="bg-[#0F172A] text-white text-sm font-body font-medium rounded-full px-4 py-1.5 transition-all duration-200 hover:scale-[1.04] hover:bg-[#0F172A]/90 hover:shadow-[0_4px_12px_rgba(15,23,42,0.15)] active:scale-[0.97] flex items-center gap-1 group"
-                >
-                  Try it free
-                  <ArrowUpRight className="w-3.5 h-3.5 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                </a>
+                {isLoggedIn ? (
+                  <>
+                    <button
+                      id="nav-user-avatar-button"
+                      type="button"
+                      onClick={() => setIsUserMenuOpen((open) => !open)}
+                      className="h-9 w-9 rounded-full bg-[#0F172A] text-white border border-white/70 shadow-sm shadow-slate-200/70 flex items-center justify-center transition-all duration-200 hover:scale-[1.04] hover:shadow-md active:scale-[0.97] cursor-pointer"
+                      aria-label="Open user menu"
+                      aria-expanded={isUserMenuOpen}
+                    >
+                      <UserCircle2 className="h-5 w-5" />
+                    </button>
+
+                    {isUserMenuOpen && (
+                      <div
+                        id="nav-user-menu"
+                        className="absolute right-0 top-[calc(100%+10px)] w-48 rounded-xl border border-[#0F172A]/10 bg-white/95 p-1.5 shadow-xl shadow-slate-300/40 backdrop-blur-md"
+                      >
+                        <a
+                          href="#upload"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors cursor-pointer"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </button>
+                        <div className="my-1 h-px bg-[#0F172A]/10" />
+                        <button
+                          type="button"
+                          onClick={handleSignOut}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Sign out
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <a 
+                      id="nav-signin-link"
+                      href="#signin" 
+                      className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
+                    >
+                      Sign in
+                    </a>
+                    <a 
+                      id="nav-tryfree-button"
+                      href="#signup" 
+                      className="bg-[#0F172A] text-white text-sm font-body font-medium rounded-full px-4 py-1.5 transition-all duration-200 hover:scale-[1.04] hover:bg-[#0F172A]/90 hover:shadow-[0_4px_12px_rgba(15,23,42,0.15)] active:scale-[0.97] flex items-center gap-1 group"
+                    >
+                      Try it free
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           </nav>

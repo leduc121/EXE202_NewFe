@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { StatCards } from "./components/stat-cards"
 import { DataTable } from "./components/data-table"
-
-import initialUsersData from "./data.json"
+import { api } from "../../../../lib/api"
+import type { AdminSummary } from "../../../../lib/api"
 
 interface User {
   id: number
@@ -29,7 +29,53 @@ interface UserFormValues {
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>(initialUsersData)
+  const [users, setUsers] = useState<User[]>([])
+  const [summary, setSummary] = useState<AdminSummary | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadUsers() {
+      setIsLoading(true)
+      setLoadError("")
+
+      try {
+        const [summaryData, items] = await Promise.all([
+          api.getAdminSummary(),
+          api.getAdminUsers(),
+        ])
+        if (cancelled) return
+        setSummary(summaryData)
+        setUsers(items.map((user, index) => ({
+          id: index + 1,
+          name: user.fullName || user.email,
+          email: user.email,
+          avatar: generateAvatar(user.fullName || user.email),
+          role: user.role,
+          plan: user.subscription,
+          billing: "Account",
+          status: user.status,
+          joinedDate: user.createdAt?.split("T")[0] || "",
+          lastLogin: user.lastLoginAt?.split("T")[0] || "Never",
+        })))
+      } catch (error) {
+        if (cancelled) return
+        setUsers([])
+        setSummary(null)
+        setLoadError(error instanceof Error ? error.message : "Could not load users")
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    loadUsers()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const generateAvatar = (name: string) => {
     const names = name.split(" ")
@@ -68,8 +114,16 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="@container/main px-4 lg:px-6">
-        <StatCards />
+        <StatCards summary={summary} isLoading={isLoading} />
       </div>
+
+      {loadError && (
+        <div className="@container/main px-4 lg:px-6">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            Could not load admin users: {loadError}. Make sure you are signed in as an admin and the backend is deployed to the expected database.
+          </div>
+        </div>
+      )}
       
       <div className="@container/main px-4 lg:px-6 mt-8 lg:mt-12">
         <DataTable 
