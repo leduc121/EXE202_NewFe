@@ -309,6 +309,33 @@ export const api = {
     return auth;
   },
 
+  async getSubscriptionPlans() {
+    return apiFetch<any[]>('/subscription-plans');
+  },
+
+  async createPayment(planId: string, method = 'payos') {
+    return apiFetch<any>('/payments', {
+      method: 'POST',
+      body: JSON.stringify({ planId, method }),
+    });
+  },
+
+  async updateProfile(dto: { fullName?: string; displayName?: string; avatarUrl?: string }) {
+    const user = await apiFetch<CurrentUser>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    });
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    return user;
+  },
+
+  async changePassword(dto: { currentPassword?: string; newPassword: string }) {
+    return apiFetch<{ success: boolean }>('/users/me/password', {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    });
+  },
+
   async getInstruments() {
     return apiFetch<Instrument[]>('/instruments');
   },

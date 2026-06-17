@@ -131,14 +131,14 @@ const PRICING_PLANS = [
   },
 ];
 
-type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin';
+type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile';
 
 const getPageFromHash = (): PageView => {
   if (typeof window === 'undefined') return 'home';
   if (window.location.pathname.endsWith('/admin')) return 'admin';
   const hash = window.location.hash.replace('#', '');
   if (hash.startsWith('admin')) return 'admin';
-  if (hash === 'signup' || hash === 'signin' || hash === 'contact' || hash === 'upload' || hash === 'simulator') return hash;
+  if (hash === 'signup' || hash === 'signin' || hash === 'contact' || hash === 'upload' || hash === 'simulator' || hash === 'profile') return hash;
   return 'home';
 };
 
@@ -187,7 +187,49 @@ function ContactCards() {
   );
 }
 
-function PricingSection() {
+function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handleCheckout = async (planCardName: string) => {
+    if (!isLoggedIn) {
+      window.location.hash = '#signup';
+      return;
+    }
+
+    if (planCardName === 'Free') {
+      return;
+    }
+
+    setLoadingPlan(planCardName);
+    try {
+      const dbPlans = await api.getSubscriptionPlans();
+      
+      let dbPlan = null;
+      if (planCardName === 'Artisan') {
+        dbPlan = dbPlans.find((p) => Number(p.price) === 99000) || dbPlans.find((p) => p.name === 'Monthly' || p.name === 'Teacher');
+      } else if (planCardName === 'Studio') {
+        dbPlan = dbPlans.find((p) => p.name === 'Yearly') || dbPlans.find((p) => p.tier === 'premium' && Number(p.price) > 200000);
+      }
+
+      if (!dbPlan) {
+        alert('Không tìm thấy thông tin gói thanh toán này trong hệ thống.');
+        return;
+      }
+
+      const response = await api.createPayment(dbPlan.id, 'payos');
+      if (response && response.checkoutUrl) {
+        window.location.href = response.checkoutUrl;
+      } else {
+        alert('Không thể tạo liên kết thanh toán. Vui lòng thử lại sau.');
+      }
+    } catch (err) {
+      console.error('Payment checkout error:', err);
+      alert(err instanceof Error ? err.message : 'Đã xảy ra lỗi trong quá trình tạo thanh toán.');
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <section className="pricing-section" id="pricing">
       <div className="pricing-watermark" aria-hidden="true">Pricing</div>
@@ -224,10 +266,23 @@ function PricingSection() {
                 <span>{plan.period}</span>
               </div>
 
-              <a className="pricing-button" href="#signup">
-                {plan.cta}
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
+              {plan.name === 'Free' ? (
+                <a className="pricing-button" href={isLoggedIn ? "#upload" : "#signup"}>
+                  {isLoggedIn ? "Start Creating" : plan.cta}
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="pricing-button"
+                  onClick={() => handleCheckout(plan.name)}
+                  disabled={loadingPlan === plan.name}
+                  style={{ cursor: 'pointer', width: '100%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  {loadingPlan === plan.name ? 'Connecting...' : plan.cta}
+                  {loadingPlan !== plan.name && <ArrowUpRight className="h-4 w-4" />}
+                </button>
+              )}
 
               <div className="pricing-feature-rule">
                 <span>Features</span>
@@ -411,6 +466,316 @@ function ContactPage() {
         Keep in touch<br />with UniWave.
       </motion.h1>
       <ContactCards />
+    </main>
+  );
+}
+
+function ProfilePage({ 
+  currentUser, 
+  onUpdateUser 
+}: { 
+  currentUser: CurrentUser | null; 
+  onUpdateUser: (user: CurrentUser) => void;
+}) {
+  const [fullName, setFullName] = useState(currentUser?.fullName || '');
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage('');
+    setProfileError('');
+    setIsSubmittingProfile(true);
+
+    try {
+      const updatedUser = await api.updateProfile({
+        fullName: fullName.trim(),
+        displayName: displayName.trim(),
+      });
+      onUpdateUser(updatedUser);
+      setProfileMessage('Cập nhật thông tin cá nhân thành công!');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Cập nhật thất bại.');
+    } finally {
+      setIsSubmittingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    setPasswordError('');
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu mới không trùng khớp.');
+      return;
+    }
+
+    setIsSubmittingPassword(true);
+    try {
+      await api.changePassword({
+        currentPassword: currentPassword || undefined,
+        newPassword,
+      });
+      setPasswordMessage('Đổi mật khẩu thành công!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Đổi mật khẩu thất bại.');
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
+
+  const capitalize = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+
+  return (
+    <main className="upload-page">
+      <div className="upload-page-orb upload-page-orb-1" aria-hidden="true" />
+      <div className="upload-page-orb upload-page-orb-2" aria-hidden="true" />
+      <div className="upload-page-orb upload-page-orb-3" aria-hidden="true" />
+
+      <a className="upload-back-link" href="#home" aria-label="Back to UniWave home">
+        <img src={logoUrl} alt="UniWave" />
+      </a>
+
+      <motion.div
+        className="upload-glass-container"
+        initial={{ opacity: 0, y: 32, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        style={{ maxWidth: '640px' }}
+      >
+        <div className="upload-header" style={{ marginBottom: '24px' }}>
+          <div className="upload-header-left">
+            <h2>
+              Thông tin cá nhân
+              <span>Quản lý tài khoản và gói dịch vụ</span>
+            </h2>
+          </div>
+          <a href="#home" className="upload-close-btn" aria-label="Close">
+            <XIcon className="w-4 h-4" />
+          </a>
+        </div>
+
+        <div 
+          style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gói dịch vụ hiện tại</span>
+            <span style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {capitalize(currentUser?.subscription || 'free')} Plan
+              <span 
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  backgroundColor: currentUser?.subscription && currentUser.subscription !== 'free' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+                  color: currentUser?.subscription && currentUser.subscription !== 'free' ? '#10b981' : '#94a3b8',
+                  border: currentUser?.subscription && currentUser.subscription !== 'free' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.15)'
+                }}
+              >
+                {currentUser?.subscription && currentUser.subscription !== 'free' ? 'Active Pro' : 'Basic Member'}
+              </span>
+            </span>
+          </div>
+          {(!currentUser?.subscription || currentUser.subscription === 'free') && (
+            <a 
+              href="#pricing"
+              className="upload-browse-btn"
+              style={{ margin: 0, textDecoration: 'none', backgroundColor: '#6366f1', color: '#ffffff', borderColor: '#6366f1' }}
+            >
+              Nâng cấp gói Pro
+            </a>
+          )}
+        </div>
+
+        <form onSubmit={handleUpdateProfile} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: '0 0 4px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '8px' }}>Chỉnh sửa thông tin</h3>
+          
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#94a3b8' }}>
+            Email đăng nhập (không thể thay đổi)
+            <input
+              type="email"
+              value={currentUser?.email || ''}
+              disabled
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                color: 'rgba(255, 255, 255, 0.4)',
+                cursor: 'not-allowed'
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
+            Họ và tên
+            <input
+              type="text"
+              placeholder="Jane Smith"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
+            Tên hiển thị
+            <input
+              type="text"
+              placeholder="Jane"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+          </label>
+
+          {profileError && <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{profileError}</p>}
+          {profileMessage && <p style={{ color: '#10b981', fontSize: '12px', margin: 0 }}>{profileMessage}</p>}
+
+          <button 
+            type="submit" 
+            disabled={isSubmittingProfile}
+            className="upload-submit-btn upload-submit-btn-active"
+            style={{
+              padding: '12px',
+              borderRadius: '10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              marginTop: '8px'
+            }}
+          >
+            {isSubmittingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </button>
+        </form>
+
+        <form onSubmit={handleChangePassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: '0 0 4px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '8px' }}>Đổi mật khẩu</h3>
+          
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
+            Mật khẩu hiện tại
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
+            Mật khẩu mới
+            <input
+              type="password"
+              placeholder="Tối thiểu 6 ký tự"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
+            Xác nhận mật khẩu mới
+            <input
+              type="password"
+              placeholder="Nhập lại mật khẩu mới"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+          </label>
+
+          {passwordError && <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{passwordError}</p>}
+          {passwordMessage && <p style={{ color: '#10b981', fontSize: '12px', margin: 0 }}>{passwordMessage}</p>}
+
+          <button 
+            type="submit" 
+            disabled={isSubmittingPassword}
+            className="upload-submit-btn upload-submit-btn-active"
+            style={{
+              padding: '12px',
+              borderRadius: '10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              backgroundColor: '#3b82f6',
+              marginTop: '8px'
+            }}
+          >
+            {isSubmittingPassword ? 'Đang đổi...' : 'Đổi mật khẩu'}
+          </button>
+        </form>
+      </motion.div>
     </main>
   );
 }
@@ -1051,6 +1416,54 @@ export default function App() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
   
+  const [paymentNotification, setPaymentNotification] = useState<{
+    status: 'success' | 'cancel';
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+
+    const isSuccess = 
+      path.includes('/payment/success') || 
+      hash.includes('payment/success') || 
+      hash.includes('payment-success');
+
+    const isCancel = 
+      path.includes('/payment/cancel') || 
+      hash.includes('payment/cancel') || 
+      hash.includes('payment-cancel');
+
+    if (isSuccess) {
+      setPaymentNotification({
+        status: 'success',
+        message: 'Tài khoản của bạn đã được nâng cấp thành công. Bắt đầu trải nghiệm ngay!',
+      });
+      const cleanHash = hash
+        .replace('/payment/success', '')
+        .replace('payment-success', '')
+        .replace('#/', '#')
+        .replace('##', '#');
+      const cleanPath = cleanHash && cleanHash !== '#' ? cleanHash : '/';
+      window.history.replaceState({}, document.title, cleanPath);
+      setTimeout(() => setPaymentNotification(null), 10000);
+    } else if (isCancel) {
+      setPaymentNotification({
+        status: 'cancel',
+        message: 'Giao dịch thanh toán đã bị hủy bỏ.',
+      });
+      const cleanHash = hash
+        .replace('/payment/cancel', '')
+        .replace('payment-cancel', '')
+        .replace('#/', '#')
+        .replace('##', '#');
+      const cleanPath = cleanHash && cleanHash !== '#' ? cleanHash : '/';
+      window.history.replaceState({}, document.title, cleanPath);
+      setTimeout(() => setPaymentNotification(null), 10000);
+    }
+  }, []);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoBgRef = useRef<HTMLDivElement>(null);
   const videoScrollWrapRef = useRef<HTMLDivElement>(null);
@@ -1101,14 +1514,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (pageView !== 'admin') return;
-    if (!isLoggedIn) {
-      window.location.hash = '#signin';
-      return;
+    if (pageView === 'admin') {
+      if (!isLoggedIn) {
+        window.location.hash = '#signin';
+        return;
+      }
+      if (currentUser && currentUser.role !== 'admin') {
+        window.location.hash = '#home';
+      }
     }
-
-    if (currentUser && currentUser.role !== 'admin') {
-      window.location.hash = '#home';
+    
+    if (pageView === 'profile' || pageView === 'upload') {
+      if (!isLoggedIn) {
+        window.location.hash = '#signin';
+      }
     }
   }, [pageView, isLoggedIn, currentUser]);
 
@@ -1261,6 +1680,10 @@ export default function App() {
     return <AdminDashboard />;
   }
 
+  if (pageView === 'profile') {
+    return <ProfilePage currentUser={currentUser} onUpdateUser={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <>
       {!introFinished && (
@@ -1361,8 +1784,36 @@ export default function App() {
                     {isUserMenuOpen && (
                       <div
                         id="nav-user-menu"
-                        className="absolute right-0 top-[calc(100%+10px)] w-48 rounded-xl border border-[#0F172A]/10 bg-white/95 p-1.5 shadow-xl shadow-slate-300/40 backdrop-blur-md"
+                        className="absolute right-0 top-[calc(100%+10px)] w-52 rounded-xl border border-[#0F172A]/10 bg-white/95 p-1.5 shadow-xl shadow-slate-300/40 backdrop-blur-md"
+                        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                       >
+                        <div className="px-3 py-2 border-b border-[#0F172A]/10 mb-1.5">
+                          <div className="font-semibold text-xs text-[#0F172A] truncate">
+                            {currentUser?.fullName}
+                          </div>
+                          <div className="text-[10px] text-[#0F172A]/60 truncate mb-1">
+                            {currentUser?.email}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span 
+                              className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                                currentUser?.subscription && currentUser.subscription !== 'free'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              {(currentUser?.subscription || 'free').toUpperCase()} PLAN
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          href="#profile"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                        >
+                          <UserCircle2 className="h-4 w-4" />
+                          Profile
+                        </a>
                         <a
                           href="#upload"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -1381,14 +1832,14 @@ export default function App() {
                             Dashboard
                           </a>
                         )}
-                        <button
-                          type="button"
+                        <a
+                          href="#profile"
                           onClick={() => setIsUserMenuOpen(false)}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors cursor-pointer"
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
                         >
                           <Settings className="h-4 w-4" />
                           Settings
-                        </button>
+                        </a>
                         <div className="my-1 h-px bg-[#0F172A]/10" />
                         <button
                           type="button"
@@ -1606,7 +2057,7 @@ export default function App() {
           </div>
         </section>
 
-        <PricingSection />
+        <PricingSection isLoggedIn={isLoggedIn} />
 
         <WaveformHero />
 
@@ -1666,6 +2117,115 @@ export default function App() {
           </div>
         </footer>
       </div>
+      
+      {paymentNotification && (
+        <div
+          id="payment-toast-notification"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            backdropFilter: 'blur(12px)',
+            color: '#ffffff',
+            padding: '16px 22px',
+            borderRadius: '16px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
+            border: `1px solid ${paymentNotification.status === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+            maxWidth: '380px',
+            animation: 'paymentToastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <style>{`
+            @keyframes paymentToastSlideIn {
+              from {
+                transform: translateY(100px) scale(0.9);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+              }
+            }
+          `}</style>
+          {paymentNotification.status === 'success' ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(16, 185, 129, 0.2)',
+              color: '#10b981',
+              fontWeight: 'bold',
+              fontSize: '16px',
+              flexShrink: 0,
+              border: '1px solid rgba(16, 185, 129, 0.4)'
+            }}>
+              ✓
+            </div>
+          ) : (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              color: '#ef4444',
+              fontWeight: 'bold',
+              fontSize: '16px',
+              flexShrink: 0,
+              border: '1px solid rgba(239, 68, 68, 0.4)'
+            }}>
+              ✕
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontWeight: 600, fontSize: '14px', color: paymentNotification.status === 'success' ? '#10b981' : '#ef4444' }}>
+              {paymentNotification.status === 'success' ? 'Thanh toán thành công' : 'Thanh toán bị hủy'}
+            </span>
+            <span style={{ fontSize: '12px', opacity: 0.9, lineHeight: '1.4', color: '#e2e8f0' }}>
+              {paymentNotification.message}
+            </span>
+          </div>
+          <button
+            onClick={() => setPaymentNotification(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              marginLeft: '8px',
+              fontSize: '16px',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = '#94a3b8';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       </>
     </>
   );
