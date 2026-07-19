@@ -88,46 +88,52 @@ const BENEFITS = [
 const PRICING_PLANS = [
   {
     name: 'Free',
-    description: 'Start learning music with UniWave Studio using essential creative tools.',
-    price: '0 VND',
-    period: '/forever',
+    planCode: 'free',
+    description: 'Dung thu cac cong cu co ban de chuyen audio ngan thanh sheet nhac.',
+    price: 'Mien phi',
+    period: '',
     features: [
-      'Learn 3 basic instruments',
-      'Access 10 sample tracks',
-      'Community support',
+      'Audio/stream chinh sua nhac toi da khoang 2 phut',
+      'Demo pho nhac co ban',
+      'Co watermark',
+      'Toi da 10 luot chuyen doi moi thang',
+      'Khong xuat MIDI',
+      'Khong luu lich su su dung/chuyen doi',
     ],
-    cta: 'Start Now',
+    cta: 'Bat dau mien phi',
   },
   {
-    name: 'Artisan',
-    description: 'Experience unlimited access to every feature in UniWave Studio.',
-    price: '99,000 VND',
-    period: '/month',
+    name: 'Goi tra phi',
+    planCode: 'paid-monthly',
+    description: 'Danh cho nguoi can pho nhac nang cao va xuat file chuyen nghiep.',
+    price: '79.000d',
+    oldPrice: '99.000d',
+    period: '/thang',
     features: [
-      'Unlock all traditional instruments',
-      'Unlimited premium track library',
-      'AI performance skill analysis',
-      'Lossless HD audio quality',
-      'Priority support 24/7',
+      'Xu ly audio co do dai khoang 5-10 phut',
+      'Ho tro nhac cu dan toc',
+      'Xuat PDF, MIDI va MusicXML',
+      'Luu tru lich su',
+      'Pho nhac theo tung nhac cu',
+      'Demo nang cao',
+      'Xoa watermark',
     ],
-    cta: 'Choose This Plan',
-    tag: 'MOST POPULAR',
+    cta: 'Chon goi nay',
+    tag: 'PHO BIEN',
     featured: true,
   },
   {
-    name: 'Studio',
-    description: 'Built for teachers and professional music creators.',
-    price: '899,000 VND',
-    period: '/year',
+    name: 'Marketplace',
+    planCode: 'marketplace',
+    description: 'Danh cho nguoi chi muon mua sheet nhac dien tu tren marketplace.',
+    price: '59.000d',
+    period: '',
     features: [
-      'Everything in the Artisan plan',
-      'Save 25% compared with monthly billing',
-      'Commercial rights for generated tracks',
-      'MIDI & MusicXML export support',
-      'Create virtual classes for students',
-      '"Artisan" profile badge',
+      'Mua sheet nhac dien tu',
+      'Khong co demo',
+      'Khong co chuc nang pho nhac',
     ],
-    cta: 'Choose This Plan',
+    cta: 'Mua tren Marketplace',
   },
 ];
 
@@ -196,7 +202,9 @@ function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
       return;
     }
 
-    if (planCardName === 'Free') {
+    const selectedPlan = PRICING_PLANS.find((plan) => plan.name === planCardName);
+
+    if (!selectedPlan || selectedPlan.planCode === 'free') {
       return;
     }
 
@@ -204,12 +212,11 @@ function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
     try {
       const dbPlans = await api.getSubscriptionPlans();
       
-      let dbPlan = null;
-      if (planCardName === 'Artisan') {
-        dbPlan = dbPlans.find((p) => Number(p.price) === 99000) || dbPlans.find((p) => p.name === 'Monthly' || p.name === 'Teacher');
-      } else if (planCardName === 'Studio') {
-        dbPlan = dbPlans.find((p) => p.name === 'Yearly') || dbPlans.find((p) => p.tier === 'premium' && Number(p.price) > 200000);
-      }
+      const normalizedName = selectedPlan.name.toLowerCase();
+      const expectedPrice = selectedPlan.planCode === 'paid-monthly' ? 79000 : 59000;
+      const dbPlan = dbPlans.find((p) => p.code === selectedPlan.planCode)
+        || dbPlans.find((p) => String(p.name || '').toLowerCase() === normalizedName)
+        || dbPlans.find((p) => Number(p.price) === expectedPrice);
 
       if (!dbPlan) {
         alert('Không tìm thấy thông tin gói thanh toán này trong hệ thống.');
@@ -263,6 +270,9 @@ function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
 
               <div className="pricing-price">
                 <strong>{plan.price}</strong>
+                {'oldPrice' in plan && plan.oldPrice && (
+                  <del>{plan.oldPrice}</del>
+                )}
                 <span>{plan.period}</span>
               </div>
 
