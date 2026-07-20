@@ -336,6 +336,13 @@ export const api = {
     });
   },
 
+  async createSupportTicket(dto: { subject: string; message: string; priority?: string }) {
+    return apiFetch<any>('/support-tickets', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
   async getInstruments() {
     return apiFetch<Instrument[]>('/instruments');
   },

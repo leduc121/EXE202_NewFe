@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PITCH_FREQ } from '../songsData';
 import { audioEngine } from '../utils/AudioEngine';
+import { nearestPitch } from '../utils/pitchMapping';
 
 interface SaoTrucSimulatorProps {
   activePitches: string[];
@@ -24,8 +25,13 @@ const FLUTE_HOLES: FluteHole[] = [
   { id: 6, label: 'Si', noteMap: 'B5', frequency: PITCH_FREQ['B5'], offsetPercent: 82 },
 ];
 
+const FLUTE_PLAYABLE_NOTES = FLUTE_HOLES.map((hole) => hole.noteMap);
+
 export default function SaoTrucSimulator({ activePitches, onKeyTrigger }: SaoTrucSimulatorProps) {
   const [localActiveHoles, setLocalActiveHoles] = useState<number[]>([]);
+  const mappedActivePitches = activePitches
+    .map((pitch) => nearestPitch(pitch, FLUTE_PLAYABLE_NOTES))
+    .filter((pitch): pitch is string => Boolean(pitch));
 
   // Sound triggering
   const handleTriggerHole = (hole: FluteHole) => {
@@ -92,8 +98,7 @@ export default function SaoTrucSimulator({ activePitches, onKeyTrigger }: SaoTru
 
           {/* The Six Playing Finger Holes */}
           {FLUTE_HOLES.map((hole) => {
-            const isNoteMatching = activePitches.includes(hole.noteMap);
-            const isClosed = isHoleClosedByPlayback(hole.id, activePitches) || localActiveHoles.includes(hole.id);
+            const isClosed = isHoleClosedByPlayback(hole.id, mappedActivePitches) || localActiveHoles.includes(hole.id);
 
             return (
               <button

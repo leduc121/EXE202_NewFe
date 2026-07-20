@@ -21,16 +21,32 @@ interface MelodixAppProps {
   initialSong?: Song;
 }
 
+const getInstrumentTypeFromSong = (song?: Song): InstrumentType => {
+  const instrument = song?.instrument.toLowerCase() || '';
+
+  if (instrument.includes('tranh')) {
+    return 'dan_tranh';
+  }
+  if (instrument.includes('bầu') || instrument.includes('bau') || instrument.includes('monochord')) {
+    return 'dan_bau';
+  }
+  if (instrument.includes('sáo') || instrument.includes('sao') || instrument.includes('flute')) {
+    return 'sao_truc';
+  }
+  if (instrument.includes('guitar')) {
+    return 'guitar';
+  }
+  if (instrument.includes('violin')) {
+    return 'violin';
+  }
+
+  return 'piano';
+};
+
 export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
   // State elements
   const [activeInstrument, setActiveInstrument] = useState<InstrumentType>(
-    initialSong
-      ? (initialSong.instrument.toLowerCase() === 'đàn tranh'
-          ? 'dan_tranh'
-          : initialSong.instrument.toLowerCase() === 'sáo trúc'
-          ? 'sao_truc'
-          : 'piano')
-      : 'piano'
+    getInstrumentTypeFromSong(initialSong)
   );
   const [activeSong, setActiveSong] = useState<Song>(initialSong || songsData[0]);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -62,13 +78,7 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
       setIsPlaying(false);
       audioEngine.stopAll();
 
-      if (initialSong.instrument.toLowerCase() === 'đàn tranh') {
-        setActiveInstrument('dan_tranh');
-      } else if (initialSong.instrument.toLowerCase() === 'sáo trúc') {
-        setActiveInstrument('sao_truc');
-      } else {
-        setActiveInstrument('piano');
-      }
+      setActiveInstrument(getInstrumentTypeFromSong(initialSong));
     }
   }, [initialSong]);
 
@@ -126,34 +136,11 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
     };
   }, [isPlaying, activeSong, activeInstrument, isLooping, isMetronome, volume]);
 
-  // Handle switching instruments: If the new song instrument matches, we sync
+  // Switch the playback timbre only; never replace the user's transcribed song.
   const handleInstrumentChange = (inst: InstrumentType) => {
     setActiveInstrument(inst);
+    setIsPlaying(false);
     audioEngine.stopAll();
-
-    // Auto-select corresponding demo song to provide perfect contextual UX
-    if (inst === 'dan_tranh' && activeSong.id !== 'beo_dat_may_troi') {
-      const dbSong = songsData.find(s => s.id === 'beo_dat_may_troi');
-      if (dbSong) {
-        setActiveSong(dbSong);
-        setCurrentTime(0);
-        setIsPlaying(false);
-      }
-    } else if (inst === 'sao_truc' && activeSong.id !== 'inh_la_oi') {
-      const fluteSong = songsData.find(s => s.id === 'inh_la_oi');
-      if (fluteSong) {
-        setActiveSong(fluteSong);
-        setCurrentTime(0);
-        setIsPlaying(false);
-      }
-    } else if (inst === 'piano' && activeSong.id !== 'chopin_nocturne') {
-      const chopinSong = songsData.find(s => s.id === 'chopin_nocturne');
-      if (chopinSong) {
-        setActiveSong(chopinSong);
-        setCurrentTime(0);
-        setIsPlaying(false);
-      }
-    }
 
     triggerToast(`Switched to Virtual ${inst.replace('_', ' ').toUpperCase()}`);
   };
@@ -162,38 +149,25 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
   const handleNextSong = () => {
     audioEngine.stopAll();
     const currentIdx = songsData.findIndex((s) => s.id === activeSong.id);
-    const nextIdx = (currentIdx + 1) % songsData.length;
+    const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % songsData.length : 0;
     const nextSong = songsData[nextIdx];
     setActiveSong(nextSong);
     setCurrentTime(0);
     setIsPlaying(false);
-
-    // Sync active instrument list matching selected preset
-    if (nextSong.instrument.toLowerCase() === 'đàn tranh') {
-      setActiveInstrument('dan_tranh');
-    } else if (nextSong.instrument.toLowerCase() === 'sáo trúc') {
-      setActiveInstrument('sao_truc');
-    } else {
-      setActiveInstrument('piano');
-    }
+    setActiveInstrument(getInstrumentTypeFromSong(nextSong));
   };
 
   const handlePrevSong = () => {
     audioEngine.stopAll();
     const currentIdx = songsData.findIndex((s) => s.id === activeSong.id);
-    const prevIdx = (currentIdx - 1 + songsData.length) % songsData.length;
+    const prevIdx = currentIdx >= 0
+      ? (currentIdx - 1 + songsData.length) % songsData.length
+      : songsData.length - 1;
     const prevSong = songsData[prevIdx];
     setActiveSong(prevSong);
     setCurrentTime(0);
     setIsPlaying(false);
-
-    if (prevSong.instrument.toLowerCase() === 'đàn tranh') {
-      setActiveInstrument('dan_tranh');
-    } else if (prevSong.instrument.toLowerCase() === 'sáo trúc') {
-      setActiveInstrument('sao_truc');
-    } else {
-      setActiveInstrument('piano');
-    }
+    setActiveInstrument(getInstrumentTypeFromSong(prevSong));
   };
 
   // Complete file transcription callback
@@ -201,15 +175,7 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
     setActiveSong(newSong);
     setCurrentTime(0);
     audioEngine.stopAll();
-    
-    // Auto sync instrument mapped
-    if (newSong.instrument.toLowerCase() === 'đàn tranh') {
-      setActiveInstrument('dan_tranh');
-    } else if (newSong.instrument.toLowerCase() === 'sáo trúc') {
-      setActiveInstrument('sao_truc');
-    } else {
-      setActiveInstrument('piano');
-    }
+    setActiveInstrument(getInstrumentTypeFromSong(newSong));
 
     triggerToast(`AI Transcription Complete: "${newSong.title}" loaded!`);
     setIsPlaying(true);

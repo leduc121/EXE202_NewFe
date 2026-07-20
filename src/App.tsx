@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
@@ -12,7 +12,11 @@ import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackP
 import type { Song } from './melo/types';
 
 
-const NAV_LINKS = ['Acoustics', 'Platters', 'Engine', 'Integrations', 'Contact'];
+const NAV_LINKS = [
+  { label: 'Convert Sheet', href: '#upload' },
+  { label: 'Report Issue', href: '#report' },
+  { label: 'Contact', href: '#contact' },
+];
 const VIDEO_SRC = 'https://res.cloudinary.com/dzhewohdo/video/upload/v1780067822/kling_20260529_Image_to_Video_Create_a_s_5676_0_nhmyll.mp4';
 
 const HOW_STEPS = [
@@ -89,62 +93,71 @@ const PRICING_PLANS = [
   {
     name: 'Free',
     planCode: 'free',
-    description: 'Dung thu cac cong cu co ban de chuyen audio ngan thanh sheet nhac.',
-    price: 'Mien phi',
+    description: 'Start with essential tools for short audio-to-sheet conversion.',
+    price: 'Free',
     period: '',
     features: [
-      'Audio/stream chinh sua nhac toi da khoang 2 phut',
-      'Demo pho nhac co ban',
-      'Co watermark',
-      'Toi da 10 luot chuyen doi moi thang',
-      'Khong xuat MIDI',
-      'Khong luu lich su su dung/chuyen doi',
+      'Audio and stream editing up to about 2 minutes',
+      'Basic sheet music demo',
+      'Watermark included',
+      'Up to 10 conversions per month',
+      'No MIDI export',
+      'No usage or conversion history',
     ],
-    cta: 'Bat dau mien phi',
+    cta: 'Start Free',
   },
   {
-    name: 'Goi tra phi',
+    name: 'Pro Plan',
     planCode: 'paid-monthly',
-    description: 'Danh cho nguoi can pho nhac nang cao va xuat file chuyen nghiep.',
-    price: '79.000d',
-    oldPrice: '99.000d',
-    period: '/thang',
+    description: 'For advanced sheet generation and professional export formats.',
+    price: '79,000 VND',
+    oldPrice: '99,000 VND',
+    period: '/month',
     features: [
-      'Xu ly audio co do dai khoang 5-10 phut',
-      'Ho tro nhac cu dan toc',
-      'Xuat PDF, MIDI va MusicXML',
-      'Luu tru lich su',
-      'Pho nhac theo tung nhac cu',
-      'Demo nang cao',
-      'Xoa watermark',
+      'Process audio around 5-10 minutes long',
+      'Traditional instrument support',
+      'Export PDF, MIDI, and MusicXML',
+      'Usage history storage',
+      'Instrument-separated notation',
+      'Advanced demo',
+      'Remove watermark',
     ],
-    cta: 'Chon goi nay',
-    tag: 'PHO BIEN',
+    cta: 'Choose Plan',
+    tag: 'POPULAR',
     featured: true,
   },
   {
     name: 'Marketplace',
     planCode: 'marketplace',
-    description: 'Danh cho nguoi chi muon mua sheet nhac dien tu tren marketplace.',
-    price: '59.000d',
+    description: 'For users who only want to buy digital sheet music.',
+    price: '59,000 VND',
     period: '',
     features: [
-      'Mua sheet nhac dien tu',
-      'Khong co demo',
-      'Khong co chuc nang pho nhac',
+      'Buy digital sheet music',
+      'No demo access',
+      'No sheet generation features',
     ],
-    cta: 'Mua tren Marketplace',
+    cta: 'Open Marketplace',
   },
 ];
 
-type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile';
+type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report';
 
 const getPageFromHash = (): PageView => {
   if (typeof window === 'undefined') return 'home';
   if (window.location.pathname.endsWith('/admin')) return 'admin';
   const hash = window.location.hash.replace('#', '');
   if (hash.startsWith('admin')) return 'admin';
-  if (hash === 'signup' || hash === 'signin' || hash === 'contact' || hash === 'upload' || hash === 'simulator' || hash === 'profile') return hash;
+  if (
+    hash === 'signup' ||
+    hash === 'signin' ||
+    hash === 'contact' ||
+    hash === 'upload' ||
+    hash === 'simulator' ||
+    hash === 'profile' ||
+    hash === 'settings' ||
+    hash === 'report'
+  ) return hash;
   return 'home';
 };
 
@@ -219,7 +232,7 @@ function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
         || dbPlans.find((p) => Number(p.price) === expectedPrice);
 
       if (!dbPlan) {
-        alert('Không tìm thấy thông tin gói thanh toán này trong hệ thống.');
+        alert('Could not find this payment plan in the system.');
         return;
       }
 
@@ -227,11 +240,11 @@ function PricingSection({ isLoggedIn }: { isLoggedIn: boolean }) {
       if (response && response.checkoutUrl) {
         window.location.href = response.checkoutUrl;
       } else {
-        alert('Không thể tạo liên kết thanh toán. Vui lòng thử lại sau.');
+        alert('Could not create a payment link. Please try again later.');
       }
     } catch (err) {
       console.error('Payment checkout error:', err);
-      alert(err instanceof Error ? err.message : 'Đã xảy ra lỗi trong quá trình tạo thanh toán.');
+      alert(err instanceof Error ? err.message : 'Something went wrong while creating the payment.');
     } finally {
       setLoadingPlan(null);
     }
@@ -480,6 +493,7 @@ function ContactPage() {
   );
 }
 
+// â•â•â• ENTRANCE ANIMATION COMPONENT â•â•â•
 function ProfilePage({ 
   currentUser, 
   onUpdateUser 
@@ -489,21 +503,16 @@ function ProfilePage({
 }) {
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
-  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
-  const [profileMessage, setProfileMessage] = useState('');
-  const [profileError, setProfileError] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const planName = currentUser?.subscription || 'free';
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileMessage('');
-    setProfileError('');
-    setIsSubmittingProfile(true);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage('');
+    setError('');
+    setIsSubmitting(true);
 
     try {
       const updatedUser = await api.updateProfile({
@@ -511,45 +520,236 @@ function ProfilePage({
         displayName: displayName.trim(),
       });
       onUpdateUser(updatedUser);
-      setProfileMessage('Cập nhật thông tin cá nhân thành công!');
-    } catch (error) {
-      setProfileError(error instanceof Error ? error.message : 'Cập nhật thất bại.');
+      setMessage('Profile updated successfully.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update your profile.');
     } finally {
-      setIsSubmittingProfile(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordMessage('');
-    setPasswordError('');
+  return (
+    <AccountShell title="Profile" subtitle="Manage your personal details and current plan">
+      <div className="account-plan-card">
+        <div>
+          <span>Current plan</span>
+          <strong>
+            {planName.charAt(0).toUpperCase() + planName.slice(1).toLowerCase()} Plan
+            <em>{planName !== 'free' ? 'Active Pro' : 'Basic Member'}</em>
+          </strong>
+        </div>
+        {planName === 'free' && (
+          <a href="#pricing" className="account-secondary-link">
+            Upgrade to Pro
+          </a>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="account-form">
+        <h3>Edit profile</h3>
+        <label>
+          Login email
+          <input type="email" value={currentUser?.email || ''} disabled />
+        </label>
+        <label>
+          Full name
+          <input
+            type="text"
+            placeholder="Jane Smith"
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Display name
+          <input
+            type="text"
+            placeholder="Jane"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+          />
+        </label>
+        {error && <p className="account-message account-message-error">{error}</p>}
+        {message && <p className="account-message account-message-success">{message}</p>}
+        <button type="submit" disabled={isSubmitting} className="account-primary-button">
+          {isSubmitting ? 'Saving...' : 'Save changes'}
+        </button>
+      </form>
+    </AccountShell>
+  );
+}
+
+function SettingsPage() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage('');
+    setError('');
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('Mật khẩu mới không trùng khớp.');
+      setError('New passwords do not match.');
       return;
     }
 
-    setIsSubmittingPassword(true);
+    setIsSubmitting(true);
     try {
       await api.changePassword({
         currentPassword: currentPassword || undefined,
         newPassword,
       });
-      setPasswordMessage('Đổi mật khẩu thành công!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : 'Đổi mật khẩu thất bại.');
+      setMessage('Password changed successfully.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change your password.');
     } finally {
-      setIsSubmittingPassword(false);
+      setIsSubmitting(false);
     }
   };
 
-  const capitalize = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+  return (
+    <AccountShell title="Settings" subtitle="Manage account security and password">
+      <form onSubmit={handleSubmit} className="account-form">
+        <h3>Change password</h3>
+        <label>
+          Current password
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+          />
+        </label>
+        <label>
+          New password
+          <input
+            type="password"
+            placeholder="At least 6 characters"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            required
+            minLength={6}
+          />
+        </label>
+        <label>
+          Confirm new password
+          <input
+            type="password"
+            placeholder="Re-enter your new password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            required
+            minLength={6}
+          />
+        </label>
+        {error && <p className="account-message account-message-error">{error}</p>}
+        {message && <p className="account-message account-message-success">{message}</p>}
+        <button type="submit" disabled={isSubmitting} className="account-primary-button">
+          {isSubmitting ? 'Changing...' : 'Change password'}
+        </button>
+      </form>
+    </AccountShell>
+  );
+}
+
+function ReportPage() {
+  const [subject, setSubject] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage('');
+    setError('');
+
+    if (!api.isAuthenticated()) {
+      window.location.hash = '#signin';
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await api.createSupportTicket({
+        subject: subject.trim(),
+        message: ticketMessage.trim(),
+        priority,
+      });
+      setSubject('');
+      setPriority('medium');
+      setTicketMessage('');
+      setMessage('Your issue report has been sent to the admin team.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not submit your issue report.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <main className="upload-page">
+    <AccountShell title="Report Issue" subtitle="Create a ticket for the admin team to review">
+      <form onSubmit={handleSubmit} className="account-form">
+        <h3>Issue details</h3>
+        <label>
+          Subject
+          <input
+            type="text"
+            placeholder="Example: MIDI file will not download"
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            required
+            maxLength={255}
+          />
+        </label>
+        <label>
+          Priority
+          <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </label>
+        <label>
+          Description
+          <textarea
+            placeholder="Describe what happened, the steps you took, your browser, and how it affects your workflow."
+            value={ticketMessage}
+            onChange={(event) => setTicketMessage(event.target.value)}
+            required
+            rows={7}
+          />
+        </label>
+        {error && <p className="account-message account-message-error">{error}</p>}
+        {message && <p className="account-message account-message-success">{message}</p>}
+        <button type="submit" disabled={isSubmitting} className="account-primary-button">
+          {isSubmitting ? 'Sending...' : 'Send report'}
+        </button>
+      </form>
+    </AccountShell>
+  );
+}
+function AccountShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="profile-page">
       <div className="upload-page-orb upload-page-orb-1" aria-hidden="true" />
       <div className="upload-page-orb upload-page-orb-2" aria-hidden="true" />
       <div className="upload-page-orb upload-page-orb-3" aria-hidden="true" />
@@ -559,238 +759,28 @@ function ProfilePage({
       </a>
 
       <motion.div
-        className="upload-glass-container"
+        className="account-panel"
         initial={{ opacity: 0, y: 32, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        style={{ maxWidth: '640px' }}
       >
-        <div className="upload-header" style={{ marginBottom: '24px' }}>
+        <div className="upload-header account-header">
           <div className="upload-header-left">
             <h2>
-              Thông tin cá nhân
-              <span>Quản lý tài khoản và gói dịch vụ</span>
+              {title}
+              <span>{subtitle}</span>
             </h2>
           </div>
           <a href="#home" className="upload-close-btn" aria-label="Close">
             <XIcon className="w-4 h-4" />
           </a>
         </div>
-
-        <div 
-          style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '16px',
-            padding: '20px',
-            marginBottom: '28px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gói dịch vụ hiện tại</span>
-            <span style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {capitalize(currentUser?.subscription || 'free')} Plan
-              <span 
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: '12px',
-                  backgroundColor: currentUser?.subscription && currentUser.subscription !== 'free' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.1)',
-                  color: currentUser?.subscription && currentUser.subscription !== 'free' ? '#10b981' : '#94a3b8',
-                  border: currentUser?.subscription && currentUser.subscription !== 'free' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.15)'
-                }}
-              >
-                {currentUser?.subscription && currentUser.subscription !== 'free' ? 'Active Pro' : 'Basic Member'}
-              </span>
-            </span>
-          </div>
-          {(!currentUser?.subscription || currentUser.subscription === 'free') && (
-            <a 
-              href="#pricing"
-              className="upload-browse-btn"
-              style={{ margin: 0, textDecoration: 'none', backgroundColor: '#6366f1', color: '#ffffff', borderColor: '#6366f1' }}
-            >
-              Nâng cấp gói Pro
-            </a>
-          )}
-        </div>
-
-        <form onSubmit={handleUpdateProfile} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: '0 0 4px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '8px' }}>Chỉnh sửa thông tin</h3>
-          
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#94a3b8' }}>
-            Email đăng nhập (không thể thay đổi)
-            <input
-              type="email"
-              value={currentUser?.email || ''}
-              disabled
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                color: 'rgba(255, 255, 255, 0.4)',
-                cursor: 'not-allowed'
-              }}
-            />
-          </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            Họ và tên
-            <input
-              type="text"
-              placeholder="Jane Smith"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                outline: 'none'
-              }}
-            />
-          </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            Tên hiển thị
-            <input
-              type="text"
-              placeholder="Jane"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                outline: 'none'
-              }}
-            />
-          </label>
-
-          {profileError && <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{profileError}</p>}
-          {profileMessage && <p style={{ color: '#10b981', fontSize: '12px', margin: 0 }}>{profileMessage}</p>}
-
-          <button 
-            type="submit" 
-            disabled={isSubmittingProfile}
-            className="upload-submit-btn upload-submit-btn-active"
-            style={{
-              padding: '12px',
-              borderRadius: '10px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              marginTop: '8px'
-            }}
-          >
-            {isSubmittingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
-          </button>
-        </form>
-
-        <form onSubmit={handleChangePassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: '0 0 4px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '8px' }}>Đổi mật khẩu</h3>
-          
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            Mật khẩu hiện tại
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                outline: 'none'
-              }}
-            />
-          </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            Mật khẩu mới
-            <input
-              type="password"
-              placeholder="Tối thiểu 6 ký tự"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={6}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                outline: 'none'
-              }}
-            />
-          </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            Xác nhận mật khẩu mới
-            <input
-              type="password"
-              placeholder="Nhập lại mật khẩu mới"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                outline: 'none'
-              }}
-            />
-          </label>
-
-          {passwordError && <p style={{ color: '#ef4444', fontSize: '12px', margin: 0 }}>{passwordError}</p>}
-          {passwordMessage && <p style={{ color: '#10b981', fontSize: '12px', margin: 0 }}>{passwordMessage}</p>}
-
-          <button 
-            type="submit" 
-            disabled={isSubmittingPassword}
-            className="upload-submit-btn upload-submit-btn-active"
-            style={{
-              padding: '12px',
-              borderRadius: '10px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: '#3b82f6',
-              marginTop: '8px'
-            }}
-          >
-            {isSubmittingPassword ? 'Đang đổi...' : 'Đổi mật khẩu'}
-          </button>
-        </form>
+        {children}
       </motion.div>
     </main>
   );
 }
 
-// ═══ ENTRANCE ANIMATION COMPONENT ═══
 function EntranceAnimation({ onComplete, canProceed }: { onComplete: () => void; canProceed: boolean }) {
   const letters = 'UNIWAVE'.split('');
 
@@ -1111,7 +1101,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
                 <div className="upload-file-details">
                   <div className="upload-file-name">{file.name}</div>
                   <div className="upload-file-size">
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB • Ready to transcribe
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB â€¢ Ready to transcribe
                   </div>
                 </div>
                 <button
@@ -1221,7 +1211,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
                 </div>
               ))}
               <div className="upload-terminal-pulse">
-                ■ SCANNING AUDIO HARMONICS...
+                â–  SCANNING AUDIO HARMONICS...
               </div>
             </div>
           </>
@@ -1353,7 +1343,7 @@ function ProcessSection() {
 
 function LogoMark() {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const notes = ['♩', '♪', '♫', '♬', '𝅘𝅥𝅮'];
+  const notes = ['â™©', 'â™ª', 'â™«', 'â™¬', 'ð…˜ð…¥ð…®'];
 
   const spawnNote = () => {
     const wrapper = wrapperRef.current;
@@ -1448,7 +1438,7 @@ export default function App() {
     if (isSuccess) {
       setPaymentNotification({
         status: 'success',
-        message: 'Tài khoản của bạn đã được nâng cấp thành công. Bắt đầu trải nghiệm ngay!',
+        message: 'Your account has been upgraded successfully. You can start using Pro now!',
       });
       const cleanHash = hash
         .replace('/payment/success', '')
@@ -1461,7 +1451,7 @@ export default function App() {
     } else if (isCancel) {
       setPaymentNotification({
         status: 'cancel',
-        message: 'Giao dịch thanh toán đã bị hủy bỏ.',
+        message: 'The payment was cancelled.',
       });
       const cleanHash = hash
         .replace('/payment/cancel', '')
@@ -1584,7 +1574,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Effect 1 — Cinematic parallax mouse coordination centered strictly around the floating vinyl platter
+  // Effect 1 â€” Cinematic parallax mouse coordination centered strictly around the floating vinyl platter
   useEffect(() => {
     let targetX = 0;
     let targetY = 0;
@@ -1646,7 +1636,7 @@ export default function App() {
     };
   }, []);
 
-  // Effect 2 — Scroll-reactive video blur & opacity for cinematic section transitions
+  // Effect 2 â€” Scroll-reactive video blur & opacity for cinematic section transitions
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
@@ -1655,8 +1645,8 @@ export default function App() {
       const progress = Math.min(1, Math.max(0, (scrollY - vh * 0.3) / (vh * 0.7)));
 
       if (videoScrollWrapRef.current) {
-        const blur = progress * 36; // 0 → 36px blur
-        const opacity = 1 - progress * 0.8; // 1 → 0.2 opacity
+        const blur = progress * 36; // 0 â†’ 36px blur
+        const opacity = 1 - progress * 0.8; // 1 â†’ 0.2 opacity
         videoScrollWrapRef.current.style.filter = `blur(${blur}px)`;
         videoScrollWrapRef.current.style.opacity = `${opacity}`;
       }
@@ -1694,6 +1684,14 @@ export default function App() {
     return <ProfilePage currentUser={currentUser} onUpdateUser={(user) => setCurrentUser(user)} />;
   }
 
+  if (pageView === 'settings') {
+    return <SettingsPage />;
+  }
+
+  if (pageView === 'report') {
+    return <ReportPage />;
+  }
+
   return (
     <>
       {!introFinished && (
@@ -1701,7 +1699,7 @@ export default function App() {
       )}
       
       <>
-      {/* ═══ Fixed cinematic video backdrop — persists across all scroll sections ═══ */}
+      {/* â•â•â• Fixed cinematic video backdrop â€” persists across all scroll sections â•â•â• */}
       <div
         id="fixed-video-backdrop"
         ref={videoScrollWrapRef}
@@ -1732,10 +1730,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* ═══ Scrollable page content ═══ */}
+      {/* â•â•â• Scrollable page content â•â•â• */}
       <div id="uniwave-luxury-root" className="text-[#0F172A] font-body relative select-none w-screen">
         
-        {/* ═══ HERO SECTION ═══ */}
+        {/* â•â•â• HERO SECTION â•â•â• */}
         <section id="hero-section" className="hero min-h-screen relative overflow-hidden">
           {/* Decorative luxury overlay accents */}
           <div 
@@ -1764,12 +1762,12 @@ export default function App() {
               >
                 {NAV_LINKS.map((link) => (
                   <a 
-                    key={link}
-                    id={`nav-link-${link.toLowerCase()}`}
-                    href={`#${link.toLowerCase()}`}
+                    key={link.href}
+                    id={`nav-link-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    href={link.href}
                     className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
                   >
-                    {link}
+                    {link.label}
                   </a>
                 ))}
               </div>
@@ -1830,7 +1828,15 @@ export default function App() {
                           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
                         >
                           <Upload className="h-4 w-4" />
-                          Upload
+                          Convert Sheet
+                        </a>
+                        <a
+                          href="#report"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                        >
+                          <MessageSquareWarning className="h-4 w-4" />
+                          Report Issue
                         </a>
                         {isAdmin && (
                           <a
@@ -1843,7 +1849,7 @@ export default function App() {
                           </a>
                         )}
                         <a
-                          href="#profile"
+                          href="#settings"
                           onClick={() => setIsUserMenuOpen(false)}
                           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
                         >
@@ -1993,12 +1999,12 @@ export default function App() {
               animate={mounted ? { opacity: 1, x: 0 } : { opacity: 0, x: 40 }}
               transition={{ delay: 0.6, duration: 0.7 }}
             >
-              Describe the auditory soundscapes in your head — build tracks that express your vision flawlessly.
+              Describe the auditory soundscapes in your head â€” build tracks that express your vision flawlessly.
             </motion.p>
           </motion.div>
         </section>
 
-        {/* ═══ HOW IT WORKS SECTION ═══ */}
+        {/* â•â•â• HOW IT WORKS SECTION â•â•â• */}
         <section className="who-section" id="who-we-are">
           <div className="who-shell">
               <motion.div
@@ -2123,7 +2129,7 @@ export default function App() {
               </a>
             </div>
 
-            <p>© 2026 UniWave Studio. Created for immersive audio.</p>
+            <p>Â© 2026 UniWave Studio. Created for immersive audio.</p>
           </div>
         </footer>
       </div>
@@ -2179,7 +2185,7 @@ export default function App() {
               flexShrink: 0,
               border: '1px solid rgba(16, 185, 129, 0.4)'
             }}>
-              ✓
+              âœ“
             </div>
           ) : (
             <div style={{
@@ -2196,12 +2202,12 @@ export default function App() {
               flexShrink: 0,
               border: '1px solid rgba(239, 68, 68, 0.4)'
             }}>
-              ✕
+              âœ•
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <span style={{ fontWeight: 600, fontSize: '14px', color: paymentNotification.status === 'success' ? '#10b981' : '#ef4444' }}>
-              {paymentNotification.status === 'success' ? 'Thanh toán thành công' : 'Thanh toán bị hủy'}
+              {paymentNotification.status === 'success' ? 'Payment successful' : 'Payment cancelled'}
             </span>
             <span style={{ fontSize: '12px', opacity: 0.9, lineHeight: '1.4', color: '#e2e8f0' }}>
               {paymentNotification.message}
@@ -2232,7 +2238,7 @@ export default function App() {
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            ✕
+            âœ•
           </button>
         </div>
       )}

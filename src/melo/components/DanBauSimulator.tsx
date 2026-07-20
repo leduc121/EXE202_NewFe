@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PITCH_FREQ } from '../songsData';
 import { audioEngine } from '../utils/AudioEngine';
+import { nearestPitch } from '../utils/pitchMapping';
 
 interface DanBauSimulatorProps {
   activePitches: string[];
@@ -25,8 +26,13 @@ const BAU_NODES: HarmonicNode[] = [
   { pitch: 'C5', vietName: 'Líu', frequency: PITCH_FREQ['C5'], label: 'Líu', positionX: 93 },
 ];
 
+const BAU_PLAYABLE_NOTES = BAU_NODES.map((node) => node.pitch);
+
 export default function DanBauSimulator({ activePitches, onKeyTrigger }: DanBauSimulatorProps) {
   const [pitchBend, setPitchBend] = useState<number>(0); // -100 to 100 pitch bend cents
+  const mappedActivePitches = activePitches
+    .map((pitch) => nearestPitch(pitch, BAU_PLAYABLE_NOTES))
+    .filter((pitch): pitch is string => Boolean(pitch));
   const [isVibrating, setIsVibrating] = useState<boolean>(false);
   const [currentTone, setCurrentTone] = useState<string>('C4');
 
@@ -159,7 +165,7 @@ export default function DanBauSimulator({ activePitches, onKeyTrigger }: DanBauS
 
           {/* Harmonic node trigger points */}
           {BAU_NODES.map((node) => {
-            const isNoteMatching = activePitches.includes(node.pitch);
+            const isNoteMatching = mappedActivePitches.includes(node.pitch);
             return (
               <button
                 key={node.pitch}

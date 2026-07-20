@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PITCH_FREQ } from '../songsData';
 import { audioEngine } from '../utils/AudioEngine';
+import { nearestPitch } from '../utils/pitchMapping';
 
 interface DanTranhSimulatorProps {
   activePitches: string[];
@@ -30,8 +31,13 @@ const TRANH_STRINGS: ZitherString[] = [
   { index: 11, pitch: 'C6', vietName: 'Líu Cao', frequency: PITCH_FREQ['C6'], label: 'Líu' },
 ];
 
+const TRANH_PLAYABLE_NOTES = TRANH_STRINGS.map((str) => str.pitch);
+
 export default function DanTranhSimulator({ activePitches, onKeyTrigger }: DanTranhSimulatorProps) {
   const [vibratingStrings, setVibratingStrings] = useState<number[]>([]);
+  const mappedActivePitches = activePitches
+    .map((pitch) => nearestPitch(pitch, TRANH_PLAYABLE_NOTES))
+    .filter((pitch): pitch is string => Boolean(pitch));
 
   const handlePluck = (str: ZitherString) => {
     // Play sound in audioEngine under zither profile
@@ -78,7 +84,7 @@ export default function DanTranhSimulator({ activePitches, onKeyTrigger }: DanTr
         {/* 12 Strings rendered as interactive columns */}
         <div className="relative w-full h-full flex flex-col justify-between items-stretch py-1">
           {TRANH_STRINGS.map((str) => {
-            const isActive = activePitches.includes(str.pitch);
+            const isActive = mappedActivePitches.includes(str.pitch);
             const isVibrating = vibratingStrings.includes(str.index) || isActive;
 
             // Compute bridge offset - mimicking S curve arrangement

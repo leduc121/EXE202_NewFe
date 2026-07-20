@@ -1980,6 +1980,233 @@ body {
   overflow: hidden;
 }
 
+.profile-page {
+  min-height: 100vh;
+  padding: 44px 20px;
+  background:
+    radial-gradient(ellipse at 25% 15%, rgba(99,102,241,0.05), transparent 45%),
+    radial-gradient(ellipse at 75% 85%, rgba(139,92,246,0.04), transparent 45%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef2f9 50%, #f5f7fb 100%);
+  color: #0f172a;
+  font-family: 'Barlow', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.account-panel {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 660px);
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
+  padding: 34px 38px 38px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 30px 90px rgba(30, 41, 59, 0.12);
+  backdrop-filter: blur(24px);
+  color: #0f172a;
+}
+
+.account-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.account-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.account-panel::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.28);
+  border-radius: 999px;
+}
+
+.account-header {
+  margin-bottom: 28px;
+}
+
+.account-header .upload-header-left h2 {
+  color: #0f172a;
+}
+
+.account-header .upload-header-left h2 span {
+  color: #64748b;
+}
+
+.account-plan-card {
+  margin-bottom: 28px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.account-plan-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-plan-card strong {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.account-plan-card em {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.account-secondary-link,
+.account-primary-button {
+  min-height: 46px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.account-secondary-link {
+  padding: 0 18px;
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.22);
+}
+
+.account-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-form h3 {
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.account-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-form input,
+.account-form select,
+.account-form textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.account-form input,
+.account-form select {
+  height: 48px;
+  padding: 0 14px;
+}
+
+.account-form textarea {
+  min-height: 150px;
+  padding: 13px 14px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.account-form input::placeholder,
+.account-form textarea::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.account-form input:focus,
+.account-form select:focus,
+.account-form textarea:focus {
+  border-color: rgba(99, 102, 241, 0.55);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.account-form input:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.account-primary-button {
+  width: 100%;
+  border: 0;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 18px 45px rgba(99, 102, 241, 0.24);
+}
+
+.account-primary-button:hover,
+.account-secondary-link:hover {
+  transform: translateY(-2px);
+}
+
+.account-primary-button:disabled {
+  opacity: 0.68;
+  cursor: wait;
+  transform: none;
+}
+
+.account-message {
+  margin: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-message-error {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.account-message-success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .upload-page-orb {
   position: absolute;
   border-radius: 9999px;
@@ -2675,6 +2902,23 @@ body {
 @media (max-width: 640px) {
   .upload-page {
     padding: 20px 0;
+  }
+
+  .profile-page {
+    padding: 20px 12px;
+    align-items: flex-start;
+  }
+
+  .account-panel {
+    width: 94vw;
+    max-height: none;
+    padding: 28px 20px;
+    border-radius: 22px;
+  }
+
+  .account-plan-card strong {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .upload-glass-container {
