@@ -2078,6 +2078,30 @@ body {
   font-weight: 800;
 }
 
+.account-usage-row {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.account-usage-row span {
+  margin-bottom: 4px;
+}
+
+.account-usage-row strong {
+  display: block;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.account-usage-note {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .account-secondary-link,
 .account-primary-button {
   min-height: 46px;

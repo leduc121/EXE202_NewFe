@@ -12,6 +12,7 @@ import PianoSimulator from './components/PianoSimulator';
 import DanTranhSimulator from './components/DanTranhSimulator';
 import DanBauSimulator from './components/DanBauSimulator';
 import SaoTrucSimulator from './components/SaoTrucSimulator';
+import StringInstrumentSimulator from './components/StringInstrumentSimulator';
 import PlayerControls from './components/PlayerControls';
 import Visualizer from './components/Visualizer';
 import AIUploadModal from './components/AIUploadModal';
@@ -232,7 +233,7 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
         />
 
         {/* WORK BENCH AREA FOR THE CORE SHEET + KEYS */}
-        <div id="main-workbench" className="flex-1 h-full flex flex-col justify-between overflow-y-auto px-6 py-4 gap-4 scrollbar-thin">
+        <div id="main-workbench" className="flex-1 h-full min-w-0 flex flex-col overflow-y-auto px-6 py-4 gap-4 scrollbar-thin">
           
           {/* TOP METADATA HEADER */}
           <Header
@@ -241,7 +242,7 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
           />
 
           {/* DYNAMIC SCROLLER SHEET MUSIC */}
-          <div className="flex-1 min-h-[300px] flex items-center">
+          <div className="flex-1 min-h-[380px] flex items-stretch">
             <SheetMusic
               song={activeSong}
               currentTime={currentTime}
@@ -309,22 +310,13 @@ export default function MelodixApp({ onBack, initialSong }: MelodixAppProps) {
               />
             )}
             {(activeInstrument === 'guitar' || activeInstrument === 'violin') && (
-              <div className="w-full flex flex-col items-center justify-center p-8 bg-[#0b121e]/90 border border-[#1a2638] rounded-2xl relative select-none">
-                <span className="text-xl font-bold text-white mb-2 uppercase tracking-wide">
-                  Virtual {activeInstrument} board
-                </span>
-                <p className="text-sm text-[#5d6e87] text-center max-w-md">
-                  Due to layout spacing limits, visual play display is mapped onto our high-fidelity virtual key registers. Play on your computer keyboard or check the sheet indicators!
-                </p>
-                <div className="mt-4 flex gap-4">
-                  <button 
-                    onClick={() => handleInstrumentChange('piano')} 
-                    className="py-2 px-4 rounded-lg bg-[#ffad4d]/10 border border-[#ffad4d]/30 text-[#ffad4d] font-bold text-xs hover:bg-[#ffad4d] hover:text-black transition-colors"
-                  >
-                    Open Piano board Instead
-                  </button>
-                </div>
-              </div>
+              <StringInstrumentSimulator
+                instrument={activeInstrument}
+                activePitches={getActivePitches()}
+                onKeyTrigger={(pitch, freq) => {
+                  // Captured manual string instrument triggers
+                }}
+              />
             )}
           </div>
 

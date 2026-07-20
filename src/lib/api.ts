@@ -149,6 +149,32 @@ export type AudioUploadResponse = {
   };
 };
 
+export type SubscriptionPlan = {
+  id: string;
+  name: string;
+  code?: string | null;
+  tier: string;
+  price: number | string;
+  monthlyConvertLimit?: number | null;
+  uploadLimit?: number | null;
+  allowPdfDownload?: boolean;
+  allowMidiDownload?: boolean;
+  allowMusicxmlDownload?: boolean;
+  allowSimulation?: boolean;
+  hasWatermark?: boolean;
+  simulationLevel?: string;
+};
+
+export type CurrentUsage = {
+  convertCount: number;
+  exportPdfCount: number;
+  exportMidiCount: number;
+  exportMusicxmlCount: number;
+  openSimulationCount: number;
+  remainingConversions: number | null;
+  plan: SubscriptionPlan | null;
+};
+
 function getStoredToken() {
   for (const key of ACCESS_TOKEN_KEYS) {
     const token = localStorage.getItem(key);
@@ -310,7 +336,7 @@ export const api = {
   },
 
   async getSubscriptionPlans() {
-    return apiFetch<any[]>('/subscription-plans');
+    return apiFetch<SubscriptionPlan[]>('/subscription-plans');
   },
 
   async createPayment(planId: string, method = 'payos') {
@@ -318,6 +344,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ planId, method }),
     });
+  },
+
+  async getCurrentUsage() {
+    return apiFetch<CurrentUsage>('/usage-limits/me');
   },
 
   async updateProfile(dto: { fullName?: string; displayName?: string; avatarUrl?: string }) {

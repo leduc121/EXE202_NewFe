@@ -26,6 +26,14 @@ const getKeySignatureSharps = (songKey: string) => {
   return 0; // C Major / A Minor
 };
 
+const truncateScoreText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3).trim()}...`;
+};
+
 export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusicProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPaperTheme = true;
@@ -46,8 +54,10 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
   const STAFF_SPACING = 55; // vertical separation between staves
   const STAFF_HEIGHT = 36;  // 4 steps of 9px each = 5 lines spaced by 9px
   const LINE_STEP = 9;
-  const TOP_PADDING = 70;
+  const TOP_PADDING = 95;
   const STAFF_X_START = 80;
+  const scoreTitle = truncateScoreText(song.title, 72);
+  const scoreArtist = truncateScoreText(song.artist, 28);
 
   // Get active staff and cursor coordinates
   const cursorInfo = useMemo(() => {
@@ -77,7 +87,7 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
   return (
     <div 
       id="sheet-music-panel" 
-      className={`w-full relative rounded-2xl p-6 transition-all duration-300 select-none ${
+      className={`w-full relative rounded-2xl p-4 md:p-6 transition-all duration-300 select-none overflow-hidden ${
         isPaperTheme 
           ? 'bg-[#fcfbf9] border border-[#e3dfd3] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.18),0_2px_8px_rgba(0,0,0,0.06)]' 
           : 'bg-[#090f19] border border-[#1a2638] shadow-2xl'
@@ -93,14 +103,14 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
       {/* SVG Canvas for drawing score */}
       <div 
         ref={containerRef} 
-        className={`w-full relative min-h-[340px] rounded-xl flex items-center justify-center p-2 overflow-x-auto scrollbar-none transition-colors duration-300 ${
+        className={`w-full relative min-h-[360px] rounded-xl flex items-center justify-center p-2 overflow-x-auto scrollbar-none transition-colors duration-300 ${
           isPaperTheme 
             ? 'bg-[#faf9f6] border border-[#ebe7dd]' 
             : 'bg-[#0c121e]/80 border border-[#141b27]'
         }`}
       >
         <svg 
-          viewBox="0 0 1000 340" 
+          viewBox="0 0 1000 370" 
           width="100%" 
           height="100%" 
           className="overflow-visible"
@@ -146,30 +156,30 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
           {/* Sheet Music Title block aligned exactly like classical papers */}
           <text 
             x="500" 
-            y="32" 
+            y="30" 
             textAnchor="middle" 
             fill={isPaperTheme ? '#1c1917' : '#ffad4d'} 
-            fontSize="19" 
+            fontSize="17" 
             fontWeight="bold" 
             fontFamily="Georgia, serif"
             letterSpacing="1.2"
           >
-            {song.title}
+            {scoreTitle}
           </text>
           <text 
             x="980" 
-            y="32" 
+            y="56" 
             textAnchor="end" 
             fill={isPaperTheme ? '#57534e' : '#8295b2'} 
             fontSize="12" 
             fontFamily="Georgia, serif"
             fontStyle="italic"
           >
-            {song.artist}
+            {scoreArtist}
           </text>
           <text 
             x="80" 
-            y="32" 
+            y="56" 
             textAnchor="start" 
             fill={isPaperTheme ? '#57534e' : '#8295b2'} 
             fontSize="10" 

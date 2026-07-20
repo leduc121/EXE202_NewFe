@@ -15,9 +15,9 @@ export default function Header({
     <div id="app-header" className="w-full flex-col md:flex-row flex justify-between items-start md:items-center gap-3 py-2.5 pb-3 border-b border-[#141d2c] select-none shrink-0">
       
       {/* Title block */}
-      <div className="flex flex-col gap-1 md:gap-1.5">
-        <div id="song-title-group" className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl md:text-2xl font-bold font-sans tracking-tight text-white mb-0">
+      <div className="flex min-w-0 max-w-full flex-1 flex-col gap-1 md:gap-1.5">
+        <div id="song-title-group" className="flex min-w-0 flex-wrap items-center gap-3">
+          <h1 className="min-w-0 max-w-full truncate text-xl md:text-2xl font-bold font-sans tracking-tight text-white mb-0">
             {activeSong.title}
           </h1>
           {activeSong.isAiGenerated && (
@@ -52,7 +52,7 @@ export default function Header({
       </div>
 
       {/* Action triggers */}
-      <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-1 md:mt-0">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 w-full md:w-auto mt-1 md:mt-0">
         {/* Upload/Transcribe focus trigger */}
         <button
           onClick={onUploadClick}

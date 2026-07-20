@@ -7,7 +7,7 @@ import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
-import { api, type CurrentUser } from './lib/api';
+import { api, type CurrentUsage, type CurrentUser } from './lib/api';
 import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackPageView } from './lib/analytics';
 import type { Song } from './melo/types';
 
@@ -142,6 +142,26 @@ const PRICING_PLANS = [
 ];
 
 type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report';
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free Plan',
+  premium: 'Pro Plan',
+  teacher: 'Marketplace',
+  'paid-monthly': 'Pro Plan',
+  marketplace: 'Marketplace',
+};
+
+const getPlanLabel = (value?: string | null) => {
+  const normalized = String(value || 'free').toLowerCase();
+  return PLAN_LABELS[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)} Plan`;
+};
+
+const getPlanBadge = (value?: string | null) => {
+  const normalized = String(value || 'free').toLowerCase();
+  if (normalized === 'free') return 'Basic Member';
+  if (normalized === 'marketplace' || normalized === 'teacher') return 'Marketplace Access';
+  return 'Active Pro';
+};
 
 const getPageFromHash = (): PageView => {
   if (typeof window === 'undefined') return 'home';
@@ -504,9 +524,43 @@ function ProfilePage({
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usage, setUsage] = useState<CurrentUsage | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const planName = currentUser?.subscription || 'free';
+  const activePlanKey = usage?.plan?.code || usage?.plan?.tier || currentUser?.subscription || 'free';
+  const normalizedActivePlanKey = String(activePlanKey).toLowerCase();
+  const planName = getPlanLabel(activePlanKey);
+  const planBadge = getPlanBadge(activePlanKey);
+  const conversionLimit = usage?.plan?.monthlyConvertLimit ?? usage?.plan?.uploadLimit ?? null;
+  const usedConversions = usage?.convertCount ?? 0;
+  const conversionUsageLabel = usage
+    ? `${usedConversions} / ${conversionLimit === null || conversionLimit === undefined ? 'Unlimited' : conversionLimit}`
+    : 'Loading...';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadUsage = async () => {
+      if (!currentUser) return;
+      setIsLoadingUsage(true);
+      try {
+        const currentUsage = await api.getCurrentUsage();
+        if (!cancelled) setUsage(currentUsage);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load current usage.');
+        }
+      } finally {
+        if (!cancelled) setIsLoadingUsage(false);
+      }
+    };
+
+    loadUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?.subscription]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -534,11 +588,16 @@ function ProfilePage({
         <div>
           <span>Current plan</span>
           <strong>
-            {planName.charAt(0).toUpperCase() + planName.slice(1).toLowerCase()} Plan
-            <em>{planName !== 'free' ? 'Active Pro' : 'Basic Member'}</em>
+            {planName}
+            <em>{planBadge}</em>
           </strong>
+          <div className="account-usage-row">
+            <span>Monthly conversions</span>
+            <strong>{conversionUsageLabel}</strong>
+          </div>
+          {isLoadingUsage && <p className="account-usage-note">Refreshing plan and usage...</p>}
         </div>
-        {planName === 'free' && (
+        {normalizedActivePlanKey === 'free' && (
           <a href="#pricing" className="account-secondary-link">
             Upgrade to Pro
           </a>
@@ -1439,6 +1498,17 @@ export default function App() {
       setPaymentNotification({
         status: 'success',
         message: 'Your account has been upgraded successfully. You can start using Pro now!',
+      });
+      [1000, 3500, 7000].forEach((delay) => {
+        window.setTimeout(async () => {
+          try {
+            const user = await api.getCurrentUser();
+            setCurrentUser(user);
+            setIsLoggedIn(true);
+          } catch (error) {
+            console.warn('Could not refresh user after payment:', error);
+          }
+        }, delay);
       });
       const cleanHash = hash
         .replace('/payment/success', '')
