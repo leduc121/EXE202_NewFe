@@ -175,6 +175,28 @@ export type CurrentUsage = {
   plan: SubscriptionPlan | null;
 };
 
+export type RatingSortMode = 'newest' | 'highest' | 'lowest';
+
+export type RatingItem = {
+  id: string;
+  score: number;
+  comment: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+export type RatingSummary = {
+  average: number;
+  total: number;
+  breakdown: Array<{
+    score: number;
+    count: number;
+  }>;
+};
+
 function getStoredToken() {
   for (const key of ACCESS_TOKEN_KEYS) {
     const token = localStorage.getItem(key);
@@ -368,6 +390,21 @@ export const api = {
 
   async createSupportTicket(dto: { subject: string; message: string; priority?: string }) {
     return apiFetch<any>('/support-tickets', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async getRatings(sort: RatingSortMode = 'newest') {
+    return apiFetch<RatingItem[]>(`/ratings?sort=${encodeURIComponent(sort)}`);
+  },
+
+  async getRatingSummary() {
+    return apiFetch<RatingSummary>('/ratings/summary');
+  },
+
+  async createRating(dto: { score: number; comment: string }) {
+    return apiFetch<RatingItem>('/ratings', {
       method: 'POST',
       body: JSON.stringify(dto),
     });

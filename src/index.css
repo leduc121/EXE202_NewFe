@@ -2280,6 +2280,21 @@ body {
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.08);
 }
 
+.rating-auth-note,
+.rating-empty-state {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.rating-empty-state {
+  padding: 22px;
+  border: 1px dashed rgba(100, 116, 139, 0.28);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
 .rating-list {
   display: flex;
   flex-direction: column;

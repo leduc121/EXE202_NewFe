@@ -7,7 +7,7 @@ import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
-import { api, type CurrentUsage, type CurrentUser } from './lib/api';
+import { api, type CurrentUsage, type CurrentUser, type RatingItem, type RatingSortMode, type RatingSummary } from './lib/api';
 import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackPageView } from './lib/analytics';
 import type { Song } from './melo/types';
 
@@ -143,48 +143,6 @@ const PRICING_PLANS = [
 ];
 
 type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report' | 'rating';
-type RatingSortMode = 'newest' | 'highest' | 'lowest';
-
-type RatingItem = {
-  id: string;
-  name: string;
-  score: number;
-  message: string;
-  createdAt: string;
-};
-
-const RATINGS_STORAGE_KEY = 'uniwave_ratings';
-
-const DEFAULT_RATINGS: RatingItem[] = [
-  {
-    id: 'rating-1',
-    name: 'Alexander Rity',
-    score: 5,
-    message: 'Clean workflow, fast conversion, and the generated sheets are easy to review.',
-    createdAt: '2026-07-20T09:40:00.000Z',
-  },
-  {
-    id: 'rating-2',
-    name: 'Emma Crieght',
-    score: 4,
-    message: 'Good value for audio-to-sheet work. I would like even more export controls later.',
-    createdAt: '2026-07-19T14:15:00.000Z',
-  },
-  {
-    id: 'rating-3',
-    name: 'Minh Tran',
-    score: 5,
-    message: 'The Pro plan makes MIDI and PDF export much smoother for my practice sessions.',
-    createdAt: '2026-07-18T07:20:00.000Z',
-  },
-  {
-    id: 'rating-4',
-    name: 'Linh Nguyen',
-    score: 3,
-    message: 'The interface is beautiful, but I want upload progress and plan limits to be clearer.',
-    createdAt: '2026-07-16T12:30:00.000Z',
-  },
-];
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free Plan',
@@ -843,17 +801,6 @@ function ReportPage() {
   );
 }
 
-function readStoredRatings() {
-  try {
-    const raw = localStorage.getItem(RATINGS_STORAGE_KEY);
-    if (!raw) return DEFAULT_RATINGS;
-    const parsed = JSON.parse(raw) as RatingItem[];
-    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_RATINGS;
-  } catch {
-    return DEFAULT_RATINGS;
-  }
-}
-
 function RatingStars({
   value,
   onChange,
@@ -896,53 +843,65 @@ function RatingStars({
 }
 
 function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
-  const [ratings, setRatings] = useState<RatingItem[]>(readStoredRatings);
+  const [ratings, setRatings] = useState<RatingItem[]>([]);
+  const [summary, setSummary] = useState<RatingSummary | null>(null);
   const [sortMode, setSortMode] = useState<RatingSortMode>('newest');
   const [score, setScore] = useState(5);
   const [review, setReview] = useState('');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
-  const totalRatings = ratings.length;
-  const averageRating = totalRatings
-    ? ratings.reduce((total, item) => total + item.score, 0) / totalRatings
-    : 0;
-  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
-    star,
-    count: ratings.filter((item) => item.score === star).length,
-  }));
-  const sortedRatings = [...ratings].sort((a, b) => {
-    if (sortMode === 'highest') return b.score - a.score || Date.parse(b.createdAt) - Date.parse(a.createdAt);
-    if (sortMode === 'lowest') return a.score - b.score || Date.parse(b.createdAt) - Date.parse(a.createdAt);
-    return Date.parse(b.createdAt) - Date.parse(a.createdAt);
-  });
+  const totalRatings = summary?.total || 0;
+  const averageRating = summary?.average || 0;
+  const ratingCounts = summary?.breakdown || [5, 4, 3, 2, 1].map((score) => ({ score, count: 0 }));
 
-  const persistRatings = (nextRatings: RatingItem[]) => {
-    setRatings(nextRatings);
-    localStorage.setItem(RATINGS_STORAGE_KEY, JSON.stringify(nextRatings));
+  const loadRatings = async (sort: RatingSortMode = sortMode) => {
+    setIsLoadingRatings(true);
+    setError('');
+    try {
+      const [nextSummary, nextRatings] = await Promise.all([
+        api.getRatingSummary(),
+        api.getRatings(sort),
+      ]);
+      setSummary(nextSummary);
+      setRatings(nextRatings);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load ratings.');
+    } finally {
+      setIsLoadingRatings(false);
+    }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  useEffect(() => {
+    loadRatings(sortMode);
+  }, [sortMode]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedReview = review.trim();
     if (!trimmedReview) return;
 
-    const displayName =
-      currentUser?.displayName ||
-      currentUser?.fullName ||
-      currentUser?.email?.split('@')[0] ||
-      'Guest User';
-    const nextRating: RatingItem = {
-      id: `rating-${Date.now()}`,
-      name: displayName,
-      score,
-      message: trimmedReview,
-      createdAt: new Date().toISOString(),
-    };
+    if (!api.isAuthenticated()) {
+      window.location.hash = '#signin';
+      return;
+    }
 
-    persistRatings([nextRating, ...ratings]);
-    setReview('');
-    setScore(5);
-    setMessage('Thanks for rating UniWave.');
+    setIsSubmittingRating(true);
+    setError('');
+    setMessage('');
+    try {
+      await api.createRating({ score, comment: trimmedReview });
+      setReview('');
+      setScore(5);
+      setMessage('Thanks for rating UniWave.');
+      await loadRatings(sortMode);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not submit your rating.');
+    } finally {
+      setIsSubmittingRating(false);
+    }
   };
 
   return (
@@ -975,7 +934,7 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
           </div>
 
           <div className="rating-bars">
-            {ratingCounts.map(({ star, count }) => {
+            {ratingCounts.map(({ score: star, count }) => {
               const percent = totalRatings ? (count / totalRatings) * 100 : 0;
               return (
                 <div className="rating-bar-row" key={star}>
@@ -1001,20 +960,30 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
             required
             maxLength={600}
           />
+          {!currentUser && <p className="rating-auth-note">Sign in to submit a rating.</p>}
+          {error && <p className="account-message account-message-error">{error}</p>}
           {message && <p className="account-message account-message-success">{message}</p>}
-          <button type="submit" className="account-primary-button">Submit rating</button>
+          <button type="submit" disabled={isSubmittingRating} className="account-primary-button">
+            {isSubmittingRating ? 'Submitting...' : 'Submit rating'}
+          </button>
         </form>
       </div>
 
       <section className="rating-list">
-        {sortedRatings.map((item) => (
+        {isLoadingRatings && <p className="rating-empty-state">Loading ratings...</p>}
+        {!isLoadingRatings && ratings.length === 0 && (
+          <p className="rating-empty-state">No ratings yet. Be the first to review UniWave.</p>
+        )}
+        {!isLoadingRatings && ratings.map((item) => {
+          const displayName = item.user?.name || 'UniWave user';
+          return (
           <article key={item.id} className="rating-review-card">
             <div className="rating-review-head">
               <div className="rating-avatar" aria-hidden="true">
-                {item.name.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <div>
-                <strong>{item.name}</strong>
+                <strong>{displayName}</strong>
                 <span>{new Date(item.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -1026,9 +995,9 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
                 <RatingStars value={item.score} size={16} />
               </div>
             </div>
-            <p>{item.message}</p>
+            <p>{item.comment}</p>
           </article>
-        ))}
+        )})}
       </section>
     </AccountShell>
   );
