@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning, Star } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
@@ -15,6 +15,7 @@ import type { Song } from './melo/types';
 const NAV_LINKS = [
   { label: 'Convert Sheet', href: '#upload' },
   { label: 'Report Issue', href: '#report' },
+  { label: 'Rating', href: '#rating' },
   { label: 'Contact', href: '#contact' },
 ];
 const VIDEO_SRC = 'https://res.cloudinary.com/dzhewohdo/video/upload/v1780067822/kling_20260529_Image_to_Video_Create_a_s_5676_0_nhmyll.mp4';
@@ -141,7 +142,49 @@ const PRICING_PLANS = [
   },
 ];
 
-type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report';
+type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report' | 'rating';
+type RatingSortMode = 'newest' | 'highest' | 'lowest';
+
+type RatingItem = {
+  id: string;
+  name: string;
+  score: number;
+  message: string;
+  createdAt: string;
+};
+
+const RATINGS_STORAGE_KEY = 'uniwave_ratings';
+
+const DEFAULT_RATINGS: RatingItem[] = [
+  {
+    id: 'rating-1',
+    name: 'Alexander Rity',
+    score: 5,
+    message: 'Clean workflow, fast conversion, and the generated sheets are easy to review.',
+    createdAt: '2026-07-20T09:40:00.000Z',
+  },
+  {
+    id: 'rating-2',
+    name: 'Emma Crieght',
+    score: 4,
+    message: 'Good value for audio-to-sheet work. I would like even more export controls later.',
+    createdAt: '2026-07-19T14:15:00.000Z',
+  },
+  {
+    id: 'rating-3',
+    name: 'Minh Tran',
+    score: 5,
+    message: 'The Pro plan makes MIDI and PDF export much smoother for my practice sessions.',
+    createdAt: '2026-07-18T07:20:00.000Z',
+  },
+  {
+    id: 'rating-4',
+    name: 'Linh Nguyen',
+    score: 3,
+    message: 'The interface is beautiful, but I want upload progress and plan limits to be clearer.',
+    createdAt: '2026-07-16T12:30:00.000Z',
+  },
+];
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free Plan',
@@ -176,7 +219,8 @@ const getPageFromHash = (): PageView => {
     hash === 'simulator' ||
     hash === 'profile' ||
     hash === 'settings' ||
-    hash === 'report'
+    hash === 'report' ||
+    hash === 'rating'
   ) return hash;
   return 'home';
 };
@@ -798,6 +842,198 @@ function ReportPage() {
     </AccountShell>
   );
 }
+
+function readStoredRatings() {
+  try {
+    const raw = localStorage.getItem(RATINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_RATINGS;
+    const parsed = JSON.parse(raw) as RatingItem[];
+    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_RATINGS;
+  } catch {
+    return DEFAULT_RATINGS;
+  }
+}
+
+function RatingStars({
+  value,
+  onChange,
+  size = 18,
+}: {
+  value: number;
+  onChange?: (value: number) => void;
+  size?: number;
+}) {
+  return (
+    <div className="rating-stars" aria-label={`${value} out of 5 stars`}>
+      {Array.from({ length: 5 }).map((_, index) => {
+        const starValue = index + 1;
+        const filled = starValue <= value;
+        const icon = (
+          <Star
+            key={starValue}
+            size={size}
+            className={filled ? 'rating-star rating-star-filled' : 'rating-star'}
+            fill={filled ? 'currentColor' : 'none'}
+          />
+        );
+
+        if (!onChange) return icon;
+
+        return (
+          <button
+            key={starValue}
+            type="button"
+            className="rating-star-button"
+            onClick={() => onChange(starValue)}
+            aria-label={`Rate ${starValue} stars`}
+          >
+            {icon}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
+  const [ratings, setRatings] = useState<RatingItem[]>(readStoredRatings);
+  const [sortMode, setSortMode] = useState<RatingSortMode>('newest');
+  const [score, setScore] = useState(5);
+  const [review, setReview] = useState('');
+  const [message, setMessage] = useState('');
+
+  const totalRatings = ratings.length;
+  const averageRating = totalRatings
+    ? ratings.reduce((total, item) => total + item.score, 0) / totalRatings
+    : 0;
+  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: ratings.filter((item) => item.score === star).length,
+  }));
+  const sortedRatings = [...ratings].sort((a, b) => {
+    if (sortMode === 'highest') return b.score - a.score || Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    if (sortMode === 'lowest') return a.score - b.score || Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+  });
+
+  const persistRatings = (nextRatings: RatingItem[]) => {
+    setRatings(nextRatings);
+    localStorage.setItem(RATINGS_STORAGE_KEY, JSON.stringify(nextRatings));
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmedReview = review.trim();
+    if (!trimmedReview) return;
+
+    const displayName =
+      currentUser?.displayName ||
+      currentUser?.fullName ||
+      currentUser?.email?.split('@')[0] ||
+      'Guest User';
+    const nextRating: RatingItem = {
+      id: `rating-${Date.now()}`,
+      name: displayName,
+      score,
+      message: trimmedReview,
+      createdAt: new Date().toISOString(),
+    };
+
+    persistRatings([nextRating, ...ratings]);
+    setReview('');
+    setScore(5);
+    setMessage('Thanks for rating UniWave.');
+  };
+
+  return (
+    <AccountShell title="Rating" subtitle="Review the web experience and UniWave services">
+      <div className="rating-layout">
+        <section className="rating-summary-card">
+          <div className="rating-summary-head">
+            <div>
+              <span>Average rating</span>
+              <strong>{averageRating.toFixed(1)}</strong>
+              <RatingStars value={Math.round(averageRating)} />
+              <em>{totalRatings} total reviews</em>
+            </div>
+            <div className="rating-filter-group" aria-label="Rating filters">
+              {[
+                ['newest', 'Newest'],
+                ['highest', 'Highest rating'],
+                ['lowest', 'Lowest rating'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={sortMode === value ? 'is-active' : ''}
+                  onClick={() => setSortMode(value as RatingSortMode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rating-bars">
+            {ratingCounts.map(({ star, count }) => {
+              const percent = totalRatings ? (count / totalRatings) * 100 : 0;
+              return (
+                <div className="rating-bar-row" key={star}>
+                  <span>{star}.0</span>
+                  <div>
+                    <i style={{ width: `${percent}%` }} />
+                  </div>
+                  <em>{count} reviews</em>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <form className="rating-form-card" onSubmit={handleSubmit}>
+          <h3>Share your rating</h3>
+          <RatingStars value={score} onChange={setScore} size={22} />
+          <textarea
+            value={review}
+            onChange={(event) => setReview(event.target.value)}
+            placeholder="Tell us what worked well or what we should improve."
+            rows={4}
+            required
+            maxLength={600}
+          />
+          {message && <p className="account-message account-message-success">{message}</p>}
+          <button type="submit" className="account-primary-button">Submit rating</button>
+        </form>
+      </div>
+
+      <section className="rating-list">
+        {sortedRatings.map((item) => (
+          <article key={item.id} className="rating-review-card">
+            <div className="rating-review-head">
+              <div className="rating-avatar" aria-hidden="true">
+                {item.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <strong>{item.name}</strong>
+                <span>{new Date(item.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}</span>
+              </div>
+              <div className="rating-review-score">
+                <b>{item.score.toFixed(1)}</b>
+                <RatingStars value={item.score} size={16} />
+              </div>
+            </div>
+            <p>{item.message}</p>
+          </article>
+        ))}
+      </section>
+    </AccountShell>
+  );
+}
+
 function AccountShell({
   title,
   subtitle,
@@ -1762,6 +1998,10 @@ export default function App() {
     return <ReportPage />;
   }
 
+  if (pageView === 'rating') {
+    return <RatingPage currentUser={currentUser} />;
+  }
+
   return (
     <>
       {!introFinished && (
@@ -1907,6 +2147,14 @@ export default function App() {
                         >
                           <MessageSquareWarning className="h-4 w-4" />
                           Report Issue
+                        </a>
+                        <a
+                          href="#rating"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                        >
+                          <Star className="h-4 w-4" />
+                          Rating
                         </a>
                         {isAdmin && (
                           <a
