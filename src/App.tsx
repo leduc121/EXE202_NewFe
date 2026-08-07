@@ -907,13 +907,57 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
   return (
     <AccountShell title="Rating" subtitle="Review the web experience and UniWave services">
       <div className="rating-layout">
-        <section className="rating-summary-card">
-          <div className="rating-summary-head">
-            <div>
-              <span>Average rating</span>
+        <aside className="rating-left-column">
+          <form className="rating-form-card" onSubmit={handleSubmit}>
+            <span className="rating-card-kicker">Your feedback</span>
+            <h3>Rate UniWave</h3>
+            <RatingStars value={score} onChange={setScore} size={24} />
+            <textarea
+              value={review}
+              onChange={(event) => setReview(event.target.value)}
+              placeholder="Tell us what worked well or what we should improve."
+              rows={5}
+              required
+              maxLength={600}
+            />
+            {!currentUser && <p className="rating-auth-note">Sign in to submit a rating.</p>}
+            {error && <p className="account-message account-message-error">{error}</p>}
+            {message && <p className="account-message account-message-success">{message}</p>}
+            <button type="submit" disabled={isSubmittingRating} className="account-primary-button">
+              {isSubmittingRating ? 'Submitting...' : 'Submit rating'}
+            </button>
+          </form>
+
+          <section className="rating-summary-card">
+            <div className="rating-summary-head">
+              <span>Customer reviews</span>
               <strong>{averageRating.toFixed(1)}</strong>
               <RatingStars value={Math.round(averageRating)} />
               <em>{totalRatings} total reviews</em>
+            </div>
+
+            <div className="rating-bars">
+              {ratingCounts.map(({ score: star, count }) => {
+                const percent = totalRatings ? (count / totalRatings) * 100 : 0;
+                return (
+                  <div className="rating-bar-row" key={star}>
+                    <span>{star}.0</span>
+                    <div>
+                      <i style={{ width: `${percent}%` }} />
+                    </div>
+                    <em>{count}</em>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </aside>
+
+        <section className="rating-right-column">
+          <div className="rating-list-header">
+            <div>
+              <span>All ratings</span>
+              <strong>{totalRatings} reviews</strong>
             </div>
             <div className="rating-filter-group" aria-label="Rating filters">
               {[
@@ -933,72 +977,39 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
             </div>
           </div>
 
-          <div className="rating-bars">
-            {ratingCounts.map(({ score: star, count }) => {
-              const percent = totalRatings ? (count / totalRatings) * 100 : 0;
+          <div className="rating-list">
+            {isLoadingRatings && <p className="rating-empty-state">Loading ratings...</p>}
+            {!isLoadingRatings && ratings.length === 0 && (
+              <p className="rating-empty-state">No ratings yet. Be the first to review UniWave.</p>
+            )}
+            {!isLoadingRatings && ratings.map((item) => {
+              const displayName = item.user?.name || 'UniWave user';
               return (
-                <div className="rating-bar-row" key={star}>
-                  <span>{star}.0</span>
-                  <div>
-                    <i style={{ width: `${percent}%` }} />
+                <article key={item.id} className="rating-review-card">
+                  <div className="rating-review-head">
+                    <div className="rating-avatar" aria-hidden="true">
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <strong>{displayName}</strong>
+                      <span>{new Date(item.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}</span>
+                    </div>
+                    <div className="rating-review-score">
+                      <b>{item.score.toFixed(1)}</b>
+                      <RatingStars value={item.score} size={16} />
+                    </div>
                   </div>
-                  <em>{count} reviews</em>
-                </div>
+                  <p>{item.comment}</p>
+                </article>
               );
             })}
           </div>
         </section>
-
-        <form className="rating-form-card" onSubmit={handleSubmit}>
-          <h3>Share your rating</h3>
-          <RatingStars value={score} onChange={setScore} size={22} />
-          <textarea
-            value={review}
-            onChange={(event) => setReview(event.target.value)}
-            placeholder="Tell us what worked well or what we should improve."
-            rows={4}
-            required
-            maxLength={600}
-          />
-          {!currentUser && <p className="rating-auth-note">Sign in to submit a rating.</p>}
-          {error && <p className="account-message account-message-error">{error}</p>}
-          {message && <p className="account-message account-message-success">{message}</p>}
-          <button type="submit" disabled={isSubmittingRating} className="account-primary-button">
-            {isSubmittingRating ? 'Submitting...' : 'Submit rating'}
-          </button>
-        </form>
       </div>
-
-      <section className="rating-list">
-        {isLoadingRatings && <p className="rating-empty-state">Loading ratings...</p>}
-        {!isLoadingRatings && ratings.length === 0 && (
-          <p className="rating-empty-state">No ratings yet. Be the first to review UniWave.</p>
-        )}
-        {!isLoadingRatings && ratings.map((item) => {
-          const displayName = item.user?.name || 'UniWave user';
-          return (
-          <article key={item.id} className="rating-review-card">
-            <div className="rating-review-head">
-              <div className="rating-avatar" aria-hidden="true">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <strong>{displayName}</strong>
-                <span>{new Date(item.createdAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}</span>
-              </div>
-              <div className="rating-review-score">
-                <b>{item.score.toFixed(1)}</b>
-                <RatingStars value={item.score} size={16} />
-              </div>
-            </div>
-            <p>{item.comment}</p>
-          </article>
-        )})}
-      </section>
     </AccountShell>
   );
 }
