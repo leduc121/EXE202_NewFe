@@ -4,7 +4,6 @@ import { MetricsOverview } from "./components/metrics-overview"
 import { SalesChart } from "./components/sales-chart"
 import { RecentTransactions } from "./components/recent-transactions"
 import { TopProducts } from "./components/top-products"
-import { CustomerInsights } from "./components/customer-insights"
 import { QuickActions } from "./components/quick-actions"
 import { RevenueBreakdown } from "./components/revenue-breakdown"
 import { useAdminDashboardData } from "@/hooks/use-admin-dashboard-data"
@@ -43,9 +42,6 @@ export default function Dashboard2() {
             <RecentTransactions transactions={dashboard.transactions} isLoading={dashboard.isLoading} />
             <TopProducts />
           </div>
-
-          {/* Fourth Row - Customer Insights and Team Performance */}
-          <CustomerInsights />
         </div>
       </div>
   )
