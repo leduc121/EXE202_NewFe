@@ -322,17 +322,21 @@ export const api = {
     const payload = { fullName, email, password, attribution };
 
     try {
-      return await apiFetch<{ success: boolean; email: string }>('/auth/register', {
+      const auth = await apiFetch<AuthResponse & { success: boolean }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      persistAuthTokens(auth);
+      return auth;
     } catch (error) {
       if (!attribution || !isNonWhitelistedAttributionError(error)) throw error;
 
-      return apiFetch<{ success: boolean; email: string }>('/auth/register', {
+      const auth = await apiFetch<AuthResponse & { success: boolean }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ fullName, email, password }),
       });
+      persistAuthTokens(auth);
+      return auth;
     }
   },
 
@@ -442,6 +446,23 @@ export const api = {
 
   async getAdminUsers() {
     return apiFetch<AdminUser[]>('/users');
+  },
+
+  async downloadAdminDashboardExport(range = '1y') {
+    const token = getStoredToken();
+    const response = await fetch(
+      `${API_BASE_URL}/dashboard/admin/export?range=${encodeURIComponent(range)}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    );
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => response.statusText);
+      throw new Error(detail || 'Could not download admin export');
+    }
+
+    return response.blob();
   },
 
   async getDefaultInstrumentId() {
