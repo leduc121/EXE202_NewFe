@@ -1,20 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import Dashboard2 from '../dashboard-2-nextjs/app/(dashboard)/dashboard/page';
 import UsersPage from '../dashboard-2-nextjs/app/(dashboard)/users/page';
-import TasksPage from '../dashboard-2-nextjs/app/(dashboard)/tasks/page';
 import CalendarPage from '../dashboard-2-nextjs/app/(dashboard)/calendar/page';
-import MailPage from '../dashboard-2-nextjs/app/(dashboard)/mail/page';
 import AccountSettings from '../dashboard-2-nextjs/app/(dashboard)/settings/account/page';
 import logoUrl from '../../assets/uniwave-logo.png';
 
-type AdminSection = 'dashboard' | 'users' | 'tasks' | 'calendar' | 'mail' | 'settings';
+type AdminSection = 'dashboard' | 'users' | 'calendar' | 'settings';
 
 const adminNav: Array<{ label: string; section: AdminSection; href: string }> = [
   { label: 'Dashboard', section: 'dashboard', href: '#admin' },
   { label: 'Users', section: 'users', href: '#admin/users' },
-  { label: 'Tasks', section: 'tasks', href: '#admin/tasks' },
   { label: 'Calendar', section: 'calendar', href: '#admin/calendar' },
-  { label: 'Mail', section: 'mail', href: '#admin/mail' },
   { label: 'Settings', section: 'settings', href: '#admin/settings' },
 ];
 
@@ -25,7 +21,7 @@ function getAdminSectionFromLocation(): AdminSection {
   const pathSection = window.location.pathname.replace(/^\/admin\/?/, '').split('/')[0];
   const section = hashSection || pathSection;
 
-  if (section === 'users' || section === 'tasks' || section === 'calendar' || section === 'mail' || section === 'settings') {
+  if (section === 'users' || section === 'calendar' || section === 'settings') {
     return section;
   }
 
@@ -51,12 +47,8 @@ export default function AdminDashboard() {
     switch (activeSection) {
       case 'users':
         return UsersPage;
-      case 'tasks':
-        return TasksPage;
       case 'calendar':
         return CalendarPage;
-      case 'mail':
-        return MailPage;
       case 'settings':
         return AccountSettings;
       default:
