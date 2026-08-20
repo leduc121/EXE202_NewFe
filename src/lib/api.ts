@@ -217,6 +217,14 @@ function getStoredToken() {
   return null;
 }
 
+function getStoredRefreshToken() {
+  for (const key of REFRESH_TOKEN_KEYS) {
+    const token = localStorage.getItem(key);
+    if (token) return token;
+  }
+  return null;
+}
+
 function persistAuthTokens(auth: AuthResponse) {
   localStorage.setItem('access_token', auth.access_token);
   localStorage.setItem('accessToken', auth.access_token);
@@ -229,6 +237,12 @@ function persistAuthTokens(auth: AuthResponse) {
 function clearAuthTokens() {
   [...ACCESS_TOKEN_KEYS, ...REFRESH_TOKEN_KEYS].forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function expireSession() {
+  clearAuthTokens();
+  window.dispatchEvent(new Event('uniwave-auth-change'));
+  if (window.location.hash !== '#signin') window.location.hash = '#signin';
 }
 
 function readStoredCurrentUser() {
@@ -263,6 +277,38 @@ async function unwrapResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+let refreshSessionPromise: Promise<boolean> | null = null;
+
+function refreshSession() {
+  if (refreshSessionPromise) return refreshSessionPromise;
+
+  refreshSessionPromise = (async () => {
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!response.ok) return false;
+
+      const auth = await unwrapResponse<AuthResponse>(response);
+      if (!auth?.access_token || !auth?.refresh_token || !auth?.user) return false;
+      persistAuthTokens(auth);
+      window.dispatchEvent(new Event('uniwave-auth-change'));
+      return true;
+    } catch {
+      return false;
+    }
+  })().finally(() => {
+    refreshSessionPromise = null;
+  });
+
+  return refreshSessionPromise;
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = getStoredToken();
@@ -273,10 +319,20 @@ async function apiFetch<T>(path: string, init: RequestInit = {}) {
 
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  let response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
   });
+
+  if (response.status === 401 && token && !path.startsWith('/auth/')) {
+    if (await refreshSession()) {
+      const refreshedToken = getStoredToken();
+      if (refreshedToken) headers.set('Authorization', `Bearer ${refreshedToken}`);
+      response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+    } else {
+      expireSession();
+    }
+  }
 
   return unwrapResponse<T>(response);
 }
@@ -304,6 +360,7 @@ function uploadWithProgress<T>(
     };
 
     request.onload = () => {
+      if (request.status === 401 && token) expireSession();
       const response = new Response(request.responseText, {
         status: request.status,
         statusText: request.statusText,
