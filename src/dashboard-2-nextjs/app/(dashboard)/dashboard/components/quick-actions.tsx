@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Plus, Settings, FileText, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { api } from "@/lib/api"
+import { api } from "../../../../../lib/api"
 
 const rangeLabels: Record<string, string> = {
   '30d': '30 ngày',
