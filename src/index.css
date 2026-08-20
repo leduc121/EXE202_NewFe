@@ -2687,6 +2687,41 @@ body {
   font-size: 13px;
 }
 
+.marketplace-access-gate {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 42px 22px;
+  text-align: center;
+}
+
+.marketplace-gate-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.marketplace-access-gate h3 {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.marketplace-access-gate p {
+  max-width: 470px;
+  margin: 0 0 8px;
+  color: #64748b;
+  line-height: 1.65;
+}
+
 @media (max-width: 800px) {
   .marketplace-layout {
     grid-template-columns: 1fr;

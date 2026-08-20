@@ -1019,7 +1019,7 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
   );
 }
 
-function MarketplacePage() {
+function MarketplacePage({ canPublish }: { canPublish: boolean }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('59000');
@@ -1042,8 +1042,22 @@ function MarketplacePage() {
   };
 
   useEffect(() => {
-    loadSheets();
-  }, []);
+    if (canPublish) loadSheets();
+    else setIsLoading(false);
+  }, [canPublish]);
+
+  if (!canPublish) {
+    return (
+      <AccountShell title="Marketplace" subtitle="Discover and publish digital sheet music">
+        <section className="marketplace-access-gate">
+          <div className="marketplace-gate-icon"><Store className="h-7 w-7" /></div>
+          <h3>Marketplace access required</h3>
+          <p>Purchase the Marketplace plan to publish and buy digital sheet music.</p>
+          <a href="#pricing" className="account-secondary-link">View Marketplace plan</a>
+        </section>
+      </AccountShell>
+    );
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1961,14 +1975,11 @@ export default function App() {
       }
     }
     
-    if (pageView === 'profile' || pageView === 'upload' || pageView === 'marketplace') {
+    if (pageView === 'profile' || pageView === 'upload') {
       if (!isLoggedIn) {
         window.location.hash = '#signin';
         return;
       }
-    }
-    if (pageView === 'marketplace' && currentUser && !hasMarketplaceAccess) {
-      window.location.hash = '#home';
     }
   }, [pageView, isLoggedIn, currentUser, hasMarketplaceAccess]);
 
@@ -2138,7 +2149,7 @@ export default function App() {
   }
 
   if (pageView === 'marketplace') {
-    return <MarketplacePage />;
+    return <MarketplacePage canPublish={hasMarketplaceAccess || isAdmin} />;
   }
 
   return (
@@ -2219,15 +2230,13 @@ export default function App() {
                     {link.label}
                   </a>
                 ))}
-                {hasMarketplaceAccess && (
-                  <a
-                    id="nav-link-marketplace"
-                    href="#marketplace"
-                    className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
-                  >
-                    Marketplace
-                  </a>
-                )}
+                <a
+                  id="nav-link-marketplace"
+                  href="#marketplace"
+                  className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
+                >
+                  Marketplace
+                </a>
               </div>
 
               <div 
@@ -2288,16 +2297,14 @@ export default function App() {
                           <Upload className="h-4 w-4" />
                           Convert Sheet
                         </a>
-                        {hasMarketplaceAccess && (
-                          <a
-                            href="#marketplace"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
-                          >
-                            <Store className="h-4 w-4" />
-                            Marketplace
-                          </a>
-                        )}
+                        <a
+                          href="#marketplace"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                        >
+                          <Store className="h-4 w-4" />
+                          Marketplace
+                        </a>
                         <a
                           href="#report"
                           onClick={() => setIsUserMenuOpen(false)}
