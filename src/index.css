@@ -2559,6 +2559,144 @@ body {
   color: #047857;
 }
 
+.marketplace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.marketplace-form,
+.marketplace-library {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 18px;
+}
+
+.marketplace-file-field input {
+  height: auto;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.marketplace-file-field span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.marketplace-library {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.marketplace-library-head,
+.marketplace-listing {
+  display: flex;
+  align-items: center;
+}
+
+.marketplace-library-head {
+  justify-content: space-between;
+  color: #475569;
+}
+
+.marketplace-library-head div,
+.marketplace-listing-copy,
+.marketplace-listing-price {
+  display: flex;
+  flex-direction: column;
+}
+
+.marketplace-library-head span,
+.marketplace-listing-copy span,
+.marketplace-listing-copy small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.marketplace-library-head strong {
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.marketplace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 490px;
+  overflow-y: auto;
+}
+
+.marketplace-listing {
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.marketplace-file-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.marketplace-listing-copy {
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.marketplace-listing-copy strong,
+.marketplace-listing-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-listing-price {
+  align-items: flex-end;
+  gap: 4px;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.marketplace-listing-price span {
+  color: #047857;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.marketplace-empty {
+  margin: 0;
+  padding: 34px 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  color: #64748b;
+  text-align: center;
+  font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .marketplace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .marketplace-listing {
+    align-items: flex-start;
+  }
+}
+
 .upload-page-orb {
   position: absolute;
   border-radius: 9999px;

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning, Star } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning, Star, Store } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
 import WaveformHero from './components/WaveformHero';
 import AdminDashboard from './components/AdminDashboard';
-import { api, type CurrentUsage, type CurrentUser, type RatingItem, type RatingSortMode, type RatingSummary } from './lib/api';
+import { api, type CurrentUsage, type CurrentUser, type MarketplaceSheet, type RatingItem, type RatingSortMode, type RatingSummary } from './lib/api';
 import { getMarketingAttributionPayload, initializeAnalytics, trackEvent, trackPageView } from './lib/analytics';
 import type { Song } from './melo/types';
 
@@ -142,7 +142,7 @@ const PRICING_PLANS = [
   },
 ];
 
-type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report' | 'rating';
+type PageView = 'home' | 'signup' | 'signin' | 'contact' | 'upload' | 'simulator' | 'admin' | 'profile' | 'settings' | 'report' | 'rating' | 'marketplace';
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free Plan',
@@ -178,7 +178,8 @@ const getPageFromHash = (): PageView => {
     hash === 'profile' ||
     hash === 'settings' ||
     hash === 'report' ||
-    hash === 'rating'
+    hash === 'rating' ||
+    hash === 'marketplace'
   ) return hash;
   return 'home';
 };
@@ -373,8 +374,12 @@ function AuthPage({ mode }: { mode: 'signup' | 'signin' }) {
           password,
           getMarketingAttributionPayload(),
         );
-        setAuthMessage('Account created. Signing you in...');
+        setAuthMessage('Account created. Signed in successfully.');
         trackEvent('sign_up', { method: 'email' });
+        trackEvent('login', { method: 'email' });
+        window.dispatchEvent(new Event('uniwave-auth-change'));
+        window.location.hash = '#upload';
+        return;
       }
 
       await api.login(email.trim(), password, getMarketingAttributionPayload());
@@ -1007,6 +1012,151 @@ function RatingPage({ currentUser }: { currentUser: CurrentUser | null }) {
                 </article>
               );
             })}
+          </div>
+        </section>
+      </div>
+    </AccountShell>
+  );
+}
+
+function MarketplacePage() {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('59000');
+  const [file, setFile] = useState<File | null>(null);
+  const [sheets, setSheets] = useState<MarketplaceSheet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const loadSheets = async () => {
+    setIsLoading(true);
+    try {
+      setSheets(await api.getMyMarketplaceSheets());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load marketplace sheets.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSheets();
+  }, []);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage('');
+    setError('');
+    if (!file) {
+      setError('Choose a PDF sheet music file first.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await api.createMarketplaceSheet({
+        title: title.trim(),
+        description: description.trim(),
+        price: Number(price),
+        file,
+      });
+      setTitle('');
+      setDescription('');
+      setPrice('59000');
+      setFile(null);
+      setMessage('Your digital sheet music is now listed.');
+      await loadSheets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not publish this sheet.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <AccountShell title="Marketplace" subtitle="Publish digital sheet music for UniWave customers">
+      <div className="marketplace-layout">
+        <form onSubmit={handleSubmit} className="account-form marketplace-form">
+          <h3>New sheet listing</h3>
+          <label>
+            Sheet title
+            <input
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Example: Nocturne in C-sharp Minor"
+              maxLength={180}
+              required
+            />
+          </label>
+          <label>
+            Price (VND)
+            <input
+              type="number"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              min={1000}
+              step={1000}
+              required
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Describe the arrangement, level, instruments, and number of pages."
+              maxLength={2000}
+              rows={5}
+            />
+          </label>
+          <label className="marketplace-file-field">
+            PDF sheet music
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              required
+            />
+            <span>{file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB` : 'PDF only · up to 20 MB'}</span>
+          </label>
+          {error && <p className="account-message account-message-error">{error}</p>}
+          {message && <p className="account-message account-message-success">{message}</p>}
+          <button type="submit" disabled={isSubmitting} className="account-primary-button">
+            <Upload className="h-4 w-4" />
+            {isSubmitting ? 'Publishing...' : 'Publish sheet'}
+          </button>
+        </form>
+
+        <section className="marketplace-library">
+          <div className="marketplace-library-head">
+            <div>
+              <span>Your catalog</span>
+              <strong>{sheets.length} listings</strong>
+            </div>
+            <Store className="h-5 w-5" />
+          </div>
+          {isLoading && <p className="marketplace-empty">Loading your listings...</p>}
+          {!isLoading && sheets.length === 0 && (
+            <p className="marketplace-empty">Your published sheet music will appear here.</p>
+          )}
+          <div className="marketplace-list">
+            {sheets.map((sheet) => (
+              <article className="marketplace-listing" key={sheet.id}>
+                <div className="marketplace-file-icon"><FileText className="h-5 w-5" /></div>
+                <div className="marketplace-listing-copy">
+                  <strong>{sheet.title}</strong>
+                  <span>{sheet.originalFilename}</span>
+                  <small>{new Date(sheet.createdAt).toLocaleDateString()}</small>
+                </div>
+                <div className="marketplace-listing-price">
+                  <strong>{sheet.price.toLocaleString('vi-VN')} {sheet.currency}</strong>
+                  <span>{sheet.status}</span>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       </div>
@@ -1690,6 +1840,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => api.getStoredCurrentUser());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
+  const hasMarketplaceAccess = currentUser?.subscription === 'teacher';
   
   const [paymentNotification, setPaymentNotification] = useState<{
     status: 'success' | 'cancel';
@@ -1810,12 +1961,16 @@ export default function App() {
       }
     }
     
-    if (pageView === 'profile' || pageView === 'upload') {
+    if (pageView === 'profile' || pageView === 'upload' || pageView === 'marketplace') {
       if (!isLoggedIn) {
         window.location.hash = '#signin';
+        return;
       }
     }
-  }, [pageView, isLoggedIn, currentUser]);
+    if (pageView === 'marketplace' && currentUser && !hasMarketplaceAccess) {
+      window.location.hash = '#home';
+    }
+  }, [pageView, isLoggedIn, currentUser, hasMarketplaceAccess]);
 
   const handleSignOut = () => {
     trackEvent('logout');
@@ -1982,6 +2137,10 @@ export default function App() {
     return <RatingPage currentUser={currentUser} />;
   }
 
+  if (pageView === 'marketplace') {
+    return <MarketplacePage />;
+  }
+
   return (
     <>
       {!introFinished && (
@@ -2060,6 +2219,15 @@ export default function App() {
                     {link.label}
                   </a>
                 ))}
+                {hasMarketplaceAccess && (
+                  <a
+                    id="nav-link-marketplace"
+                    href="#marketplace"
+                    className="text-sm font-body font-light text-[#0F172A]/70 hover:text-[#0F172A] transition-colors duration-200"
+                  >
+                    Marketplace
+                  </a>
+                )}
               </div>
 
               <div 
@@ -2120,6 +2288,16 @@ export default function App() {
                           <Upload className="h-4 w-4" />
                           Convert Sheet
                         </a>
+                        {hasMarketplaceAccess && (
+                          <a
+                            href="#marketplace"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#0F172A]/80 hover:bg-[#0F172A]/5 hover:text-[#0F172A] transition-colors"
+                          >
+                            <Store className="h-4 w-4" />
+                            Marketplace
+                          </a>
+                        )}
                         <a
                           href="#report"
                           onClick={() => setIsUserMenuOpen(false)}

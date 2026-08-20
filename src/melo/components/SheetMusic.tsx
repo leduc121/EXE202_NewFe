@@ -1,5 +1,5 @@
-import React, { useRef, useMemo } from 'react';
-import { Song } from '../types';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Note, Song } from '../types';
 
 interface SheetMusicProps {
   song: Song;
@@ -34,21 +34,67 @@ const truncateScoreText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength - 3).trim()}...`;
 };
 
+const MEASURES_PER_STAFF = 4;
+
+type DisplayNote = Note & {
+  displayTime: number;
+  staffOffset: number;
+  chordOffset: number;
+};
+
+const getStaffOffset = (pitch: string) => {
+  const match = /^([A-G])#?(\d+)$/.exec(pitch);
+  if (!match) return 0;
+
+  const noteIndex = ['C', 'D', 'E', 'F', 'G', 'A', 'B'].indexOf(match[1]);
+  const octave = Number(match[2]);
+  return (octave - 4) * 7 + noteIndex;
+};
+
+const prepareDisplayNotes = (notes: Note[], gridDuration: number): DisplayNote[] => {
+  const uniqueNotes = new Map<string, DisplayNote>();
+
+  notes.forEach((note) => {
+    const displayTime = Math.round(note.time / gridDuration) * gridDuration;
+    const key = `${Math.round(displayTime / gridDuration)}:${note.pitch}`;
+    const existing = uniqueNotes.get(key);
+
+    if (!existing || note.duration > existing.duration) {
+      uniqueNotes.set(key, {
+        ...note,
+        displayTime,
+        staffOffset: getStaffOffset(note.pitch),
+        chordOffset: 0,
+      });
+    }
+  });
+
+  const groupedByTime = new Map<number, DisplayNote[]>();
+  uniqueNotes.forEach((note) => {
+    const timeKey = Math.round(note.displayTime / gridDuration);
+    const chord = groupedByTime.get(timeKey) || [];
+    chord.push(note);
+    groupedByTime.set(timeKey, chord);
+  });
+
+  groupedByTime.forEach((chord) => {
+    chord.sort((a, b) => a.staffOffset - b.staffOffset);
+    chord.forEach((note, index) => {
+      const previous = chord[index - 1];
+      if (previous && note.staffOffset - previous.staffOffset <= 1) {
+        note.chordOffset = previous.chordOffset === 0 ? 7 : 0;
+      }
+    });
+  });
+
+  return Array.from(uniqueNotes.values()).sort(
+    (a, b) => a.displayTime - b.displayTime || a.staffOffset - b.staffOffset,
+  );
+};
+
 export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusicProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isPaperTheme = true;
-
-  // Divide song duration across 3 beautiful staves
-  const staffRanges = useMemo(() => {
-    const total = song.duration || 30;
-    const count = 3;
-    const step = total / count;
-    return Array.from({ length: count }, (_, idx) => ({
-      start: idx * step,
-      end: (idx + 1) * step,
-      index: idx
-    }));
-  }, [song.duration]);
 
   // Parameters for rendering staff lines
   const STAFF_SPACING = 55; // vertical separation between staves
@@ -56,8 +102,27 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
   const LINE_STEP = 9;
   const TOP_PADDING = 95;
   const STAFF_X_START = 80;
+  const BOTTOM_PADDING = 55;
   const scoreTitle = truncateScoreText(song.title, 72);
   const scoreArtist = truncateScoreText(song.artist, 28);
+
+  const beatsPerMeasure = useMemo(() => parseInt(song.timeSignature?.split('/')[0] || '4', 10), [song.timeSignature]);
+  const measureDuration = useMemo(() => (beatsPerMeasure * 60) / (song.tempo || 72), [beatsPerMeasure, song.tempo]);
+  const staffDuration = measureDuration * MEASURES_PER_STAFF;
+  const staffRanges = useMemo(() => {
+    const total = Math.max(song.duration || 0, measureDuration);
+    const count = Math.max(1, Math.ceil(total / staffDuration));
+    return Array.from({ length: count }, (_, index) => ({
+      start: index * staffDuration,
+      end: Math.min((index + 1) * staffDuration, total),
+      index,
+    }));
+  }, [measureDuration, song.duration, staffDuration]);
+  const displayNotes = useMemo(
+    () => prepareDisplayNotes(song.notes, Math.max(0.06, 60 / (song.tempo || 72) / 4)),
+    [song.notes, song.tempo],
+  );
+  const scoreHeight = TOP_PADDING + staffRanges.length * (STAFF_HEIGHT + STAFF_SPACING) + BOTTOM_PADDING;
 
   // Get active staff and cursor coordinates
   const cursorInfo = useMemo(() => {
@@ -81,8 +146,11 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
   }, [currentTime, song.duration, staffRanges]);
 
   const numSharps = useMemo(() => getKeySignatureSharps(song.key), [song.key]);
-  const beatsPerMeasure = useMemo(() => parseInt(song.timeSignature?.split('/')[0] || '4', 10), [song.timeSignature]);
-  const measureDuration = useMemo(() => (beatsPerMeasure * 60) / (song.tempo || 72), [beatsPerMeasure, song.tempo]);
+
+  useEffect(() => {
+    const activeStaff = containerRef.current?.querySelector(`#staff-${cursorInfo.activeIndex}`);
+    activeStaff?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [cursorInfo.activeIndex]);
 
   return (
     <div 
@@ -103,17 +171,17 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
       {/* SVG Canvas for drawing score */}
       <div 
         ref={containerRef} 
-        className={`w-full relative min-h-[360px] rounded-xl flex items-center justify-center p-2 overflow-x-auto scrollbar-none transition-colors duration-300 ${
+        className={`w-full relative h-[min(52vh,520px)] min-h-[360px] rounded-xl p-2 overflow-auto scrollbar-thin transition-colors duration-300 ${
           isPaperTheme 
             ? 'bg-[#faf9f6] border border-[#ebe7dd]' 
             : 'bg-[#0c121e]/80 border border-[#141b27]'
         }`}
       >
         <svg 
-          viewBox="0 0 1000 370" 
+          viewBox={`0 0 1000 ${scoreHeight}`}
           width="100%" 
-          height="100%" 
-          className="overflow-visible"
+          height={scoreHeight}
+          className="block min-w-[820px]"
         >
           {/* Definitions for templates and filters */}
           <defs>
@@ -192,14 +260,14 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
           {staffRanges.map((range, index) => {
             const staffY = TOP_PADDING + index * (STAFF_HEIGHT + STAFF_SPACING);
             const isActiveStaff = cursorInfo.activeIndex === index;
-            const xStart = STAFF_X_START + (index === 0 ? 95 : 80);
+            const xStart = STAFF_X_START + 95;
             const xEnd = 980;
 
             // Find measures that fall on this staff range
             const staffMeasures = [];
-            let mTime = measureDuration;
-            let measureIndex = 2; // Measure 1 is at the very start
-            while (mTime < song.duration) {
+            let mTime = range.start + measureDuration;
+            let measureIndex = Math.floor(range.start / measureDuration) + 2;
+            while (mTime < range.end) {
               if (mTime > range.start && mTime < range.end) {
                 staffMeasures.push({ time: mTime, index: measureIndex });
               }
@@ -366,15 +434,15 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
                 )}
 
                 {/* Notes Loop */}
-                {song.notes
-                  .filter(note => note.time >= range.start && note.time < range.end)
+                {displayNotes
+                  .filter(note => note.displayTime >= range.start && note.displayTime < range.end)
                   .map((note, noteIdx) => {
                     const durationOnThisStaff = range.end - range.start;
-                    const elapsedOnThisStaff = note.time - range.start;
-                    const noteX = xStart + (elapsedOnThisStaff / durationOnThisStaff) * (xEnd - xStart);
+                    const elapsedOnThisStaff = note.displayTime - range.start;
+                    const noteX = xStart + (elapsedOnThisStaff / durationOnThisStaff) * (xEnd - xStart) + note.chordOffset;
 
                     // Staff pitch mapping
-                    const staffOffsetVal = PITCH_STAFF_OFFSET[note.pitch] !== undefined ? PITCH_STAFF_OFFSET[note.pitch] : 4;
+                    const staffOffsetVal = PITCH_STAFF_OFFSET[note.pitch] ?? note.staffOffset;
                     const noteY = staffY + STAFF_HEIGHT - (staffOffsetVal - 2) * (LINE_STEP / 2);
 
                     // Check if note is currently playing
@@ -497,7 +565,7 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
                           </text>
                         )}
 
-                        {/* Letter mapping bubble under note head */}
+                        {/* Keep labels available without covering the whole score. */}
                         <text
                           x={noteX}
                           y={noteY + (stemUp ? 18 : 32)}
@@ -505,7 +573,7 @@ export default function SheetMusic({ song, currentTime, onNoteClick }: SheetMusi
                           fill={isNoteActive ? (isPaperTheme ? '#7c2d12' : '#ffffff') : (isPaperTheme ? '#57534e' : '#4e5a70')}
                           fontSize="9.5"
                           fontWeight="bold"
-                          className="font-mono scale-95"
+                          className={`font-mono transition-opacity ${isNoteActive ? 'opacity-100' : 'opacity-0 group-hover/note:opacity-100'}`}
                         >
                           {note.pitch}
                         </text>

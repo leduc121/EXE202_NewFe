@@ -197,6 +197,18 @@ export type RatingSummary = {
   }>;
 };
 
+export type MarketplaceSheet = {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  originalFilename: string;
+  fileSizeBytes: string;
+  status: string;
+  createdAt: string;
+};
+
 function getStoredToken() {
   for (const key of ACCESS_TOKEN_KEYS) {
     const token = localStorage.getItem(key);
@@ -414,6 +426,24 @@ export const api = {
     });
   },
 
+  async getMyMarketplaceSheets() {
+    return apiFetch<MarketplaceSheet[]>('/marketplace/my-sheets');
+  },
+
+  async createMarketplaceSheet(dto: {
+    title: string;
+    description?: string;
+    price: number;
+    file: File;
+  }) {
+    const formData = new FormData();
+    formData.append('title', dto.title);
+    formData.append('description', dto.description || '');
+    formData.append('price', String(dto.price));
+    formData.append('file', dto.file);
+    return uploadWithProgress<MarketplaceSheet>('/marketplace/sheets', formData);
+  },
+
   async getInstruments() {
     return apiFetch<Instrument[]>('/instruments');
   },
@@ -493,6 +523,11 @@ export const api = {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => response.statusText);
+      if (response.status === 403) {
+        throw new Error(
+          'Your sheet preview was created successfully. Upgrade to Pro to download MIDI and open the simulator.',
+        );
+      }
       throw new Error(detail || 'Could not download generated MIDI');
     }
 
@@ -501,7 +536,7 @@ export const api = {
 
   async downloadGeneratedPdf(generationId: string) {
     const token = getStoredToken();
-    const response = await fetch(`${API_BASE_URL}/sheet-generations/${generationId}/pdf/file`, {
+    const response = await fetch(`${API_BASE_URL}/sheet-generations/${generationId}/pdf/file/download`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
 
