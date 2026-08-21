@@ -564,11 +564,13 @@ export const api = {
   async uploadAudioForSheet(
     file: File,
     instrumentId: string,
+    durationSeconds: number,
     onProgress?: (percent: number) => void,
   ) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('instrumentId', instrumentId);
+    formData.append('durationSeconds', String(durationSeconds));
     return uploadWithProgress<AudioUploadResponse>('/audio-uploads', formData, onProgress);
   },
 
@@ -614,10 +616,16 @@ export const api = {
     options: {
       instrumentId: string;
       instrumentName?: string;
+      durationSeconds: number;
       onProgress?: (percent: number) => void;
     },
   ): Promise<{ upload: AudioUploadResponse; song: Song; generationId: string; pdfUrl?: string }> {
-    const upload = await this.uploadAudioForSheet(file, options.instrumentId, options.onProgress);
+    const upload = await this.uploadAudioForSheet(
+      file,
+      options.instrumentId,
+      options.durationSeconds,
+      options.onProgress,
+    );
     const generationId = upload.sheetGeneration?.id;
     if (!generationId) throw new Error(upload.processingError || 'Backend did not return a sheet generation');
 

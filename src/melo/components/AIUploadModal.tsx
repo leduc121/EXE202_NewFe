@@ -10,6 +10,28 @@ interface AIUploadModalProps {
   onTranscriptionComplete: (song: Song) => void;
 }
 
+function readAudioDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const audio = document.createElement('audio');
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration;
+      cleanup();
+      Number.isFinite(duration) && duration > 0
+        ? resolve(duration)
+        : reject(new Error('Could not determine audio duration.'));
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read this audio file.'));
+    };
+    audio.src = objectUrl;
+  });
+}
+
 export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete }: AIUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [promptInput, setPromptInput] = useState<string>('');
@@ -59,6 +81,7 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
       }
 
       try {
+        const durationSeconds = await readAudioDuration(file);
         setProgressLog(['[0.0s] Connecting to UniWave backend...']);
         const instrumentId = await api.getDefaultInstrumentId();
         if (!instrumentId) throw new Error('No active instrument is available in backend');
@@ -67,6 +90,7 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
         setProgressLog((prev) => [...prev, '[0.4s] Uploading audio to Render backend...']);
         const result = await api.transcribeToSong(file, {
           instrumentId,
+          durationSeconds,
           onProgress: (percent) => {
             if (percent >= 99) {
               setActiveStep(4);
