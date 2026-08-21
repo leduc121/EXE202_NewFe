@@ -607,6 +607,20 @@ export const api = {
     return response.blob();
   },
 
+  async viewGeneratedPdf(generationId: string) {
+    const token = getStoredToken();
+    const response = await fetch(`${API_BASE_URL}/sheet-generations/${generationId}/pdf/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => response.statusText);
+      throw new Error(detail || 'Could not open generated PDF preview');
+    }
+
+    return response.blob();
+  },
+
   pdfUrl(generationId: string) {
     return `${API_BASE_URL}/sheet-generations/${generationId}/pdf/file`;
   },
@@ -617,9 +631,10 @@ export const api = {
       instrumentId: string;
       instrumentName?: string;
       durationSeconds: number;
+      previewOnly?: boolean;
       onProgress?: (percent: number) => void;
     },
-  ): Promise<{ upload: AudioUploadResponse; song: Song; generationId: string; pdfUrl?: string }> {
+  ): Promise<{ upload: AudioUploadResponse; song: Song | null; generationId: string; pdfUrl?: string }> {
     const upload = await this.uploadAudioForSheet(
       file,
       options.instrumentId,
@@ -628,6 +643,10 @@ export const api = {
     );
     const generationId = upload.sheetGeneration?.id;
     if (!generationId) throw new Error(upload.processingError || 'Backend did not return a sheet generation');
+
+    if (options.previewOnly) {
+      return { upload, song: null, generationId, pdfUrl: this.pdfUrl(generationId) };
+    }
 
     const midi = await this.downloadGeneratedMidi(generationId);
     const title = upload.sheetGeneration?.title || file.name.replace(/\.[^/.]+$/, '') || 'Transcribed Song';

@@ -104,6 +104,7 @@ export default function AIUploadModal({ isOpen, onClose, onTranscriptionComplete
 
         setActiveStep(7);
         setProgressLog((prev) => [...prev, '[ready] MIDI score mapped to simulator notes.']);
+        if (!result.song) throw new Error('The simulator preview is unavailable for this plan.');
         onTranscriptionComplete(
           result.song.notes.length
             ? result.song

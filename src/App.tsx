@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { motion, useScroll } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Save, Share2, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning, Star, Store } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Disc, Timer, Feather, Target, BookOpen, Handshake, ShieldCheck, Upload, Music, Loader2, FileAudio, X as XIcon, CheckCircle2, FileText, Download, UserCircle2, Settings, LogOut, LayoutDashboard, MessageSquareWarning, Star, Store } from 'lucide-react';
 import logoUrl from '../assets/uniwave-logo.png';
 import MelodixApp from './melo/MelodixApp';
 import { songsData } from './melo/songsData';
@@ -19,6 +19,28 @@ const NAV_LINKS = [
   { label: 'Contact', href: '#contact' },
 ];
 const VIDEO_SRC = 'https://res.cloudinary.com/dzhewohdo/video/upload/v1780067822/kling_20260529_Image_to_Video_Create_a_s_5676_0_nhmyll.mp4';
+
+function readAudioDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const audio = document.createElement('audio');
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration;
+      cleanup();
+      Number.isFinite(duration) && duration > 0
+        ? resolve(duration)
+        : reject(new Error('Could not determine audio duration.'));
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read this audio file.'));
+    };
+    audio.src = objectUrl;
+  });
+}
 
 const HOW_STEPS = [
   {
@@ -1289,6 +1311,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
   const [activeStep, setActiveStep] = useState(0);
   const [transcribedSong, setTranscribedSong] = useState<Song | null>(null);
   const [generatedSheetId, setGeneratedSheetId] = useState<string | null>(null);
+  const [activePlan, setActivePlan] = useState<CurrentUsage['plan']>(null);
   const [uploadError, setUploadError] = useState('');
 
   const dragOverHandler = (e: React.DragEvent) => {
@@ -1334,6 +1357,9 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
     });
 
     try {
+      const durationSeconds = await readAudioDuration(file);
+      const usage = await api.getCurrentUsage();
+      setActivePlan(usage.plan);
       setProgressLog((prev) => [...prev, '[0.0s] Connecting to UniWave backend...']);
       const instrumentId = await api.getDefaultInstrumentId();
       if (!instrumentId) throw new Error('No active instrument is available in backend');
@@ -1341,6 +1367,8 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       setProgressLog((prev) => [...prev, '[0.4s] Uploading audio to Render backend...']);
       const result = await api.transcribeToSong(file, {
         instrumentId,
+        durationSeconds,
+        previewOnly: !usage.plan?.allowMidiDownload,
         onProgress: (percent) => {
           setUploadPercent(percent);
           if (percent >= 99) {
@@ -1354,28 +1382,29 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
         },
       });
 
-      const finalSong = result.song.notes.length
+      const finalSong = result.song?.notes.length
         ? result.song
-        : {
+        : result.song ? {
             ...result.song,
             notes: songsData[0].notes,
             duration: songsData[0].duration,
-          };
+          } : null;
 
       setUploadPercent(100);
       setTranscribedSong(finalSong);
       setGeneratedSheetId(result.generationId);
       setProgressLog((prev) => [
         ...prev,
-        '[ready] MIDI score downloaded from backend.',
-        '[ready] Notes mapped into the Melodix simulator.',
+        usage.plan?.allowMidiDownload
+          ? '[ready] Notes mapped into the Melodix simulator.'
+          : '[ready] Basic watermarked sheet preview is available.',
       ]);
       setActiveStep(7);
       setPhase('success');
       trackEvent('audio_transcription_complete', {
         generation_id: result.generationId,
         instrument_name: result.upload.instrument?.name || 'unknown',
-        note_count: finalSong.notes.length,
+        note_count: finalSong?.notes.length || 0,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI transcription failed';
@@ -1442,6 +1471,18 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
     } catch (error) {
       runSuccessAction(error instanceof Error ? error.message : 'Could not open generated PDF.');
+    }
+  };
+
+  const viewBasicPreview = async () => {
+    if (!generatedSheetId) return;
+    try {
+      const pdfBlob = await api.viewGeneratedPdf(generatedSheetId);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+    } catch (error) {
+      runSuccessAction(error instanceof Error ? error.message : 'Could not open sheet preview.');
     }
   };
 
@@ -1665,8 +1706,9 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
             </div>
             <div className="upload-success-title">Sheet Music Ready!</div>
             <div className="upload-success-subtitle">
-              Your audio has been transcribed into playable sheet music.
-              Open the Melodix Simulator to start performing with virtual instruments.
+              {activePlan?.allowSimulation
+                ? 'Your audio has been transcribed into playable sheet music. Open the simulator to perform with virtual instruments.'
+                : 'Your basic watermarked sheet preview is ready.'}
             </div>
             <div className="upload-success-actions" aria-label="Sheet music actions">
               <button
@@ -1679,6 +1721,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
                   setUploadPercent(0);
                   setTranscribedSong(null);
                   setGeneratedSheetId(null);
+                  setActivePlan(null);
                   setUploadError('');
                   setPhase('idle');
                 }}
@@ -1686,28 +1729,26 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
                 <FileText className="w-4 h-4" />
                 New
               </button>
-              <button type="button" onClick={() => runSuccessAction('Sheet music details saved to your profile.')}>
-                <Save className="w-4 h-4" />
-                Save
-              </button>
-              <button type="button" onClick={() => runSuccessAction('Share link copied to clipboard!')}>
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
-              <button
-                type="button"
-                className="upload-success-action-primary"
-                onClick={exportGeneratedSheet}
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
+              {activePlan?.allowPdfDownload && (
+                <button type="button" className="upload-success-action-primary" onClick={exportGeneratedSheet}>
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+              )}
             </div>
-            <button className="upload-success-btn" onClick={openMelodix}>
-              <Music className="w-5 h-5" />
-              Open Instrument Simulator
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            {activePlan?.allowSimulation ? (
+              <button className="upload-success-btn" onClick={openMelodix}>
+                <Music className="w-5 h-5" />
+                Open Instrument Simulator
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button className="upload-success-btn" onClick={viewBasicPreview}>
+                <FileText className="w-5 h-5" />
+                View Basic Preview
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
       </motion.div>
