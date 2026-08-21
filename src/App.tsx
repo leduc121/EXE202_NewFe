@@ -1368,7 +1368,7 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       const result = await api.transcribeToSong(file, {
         instrumentId,
         durationSeconds,
-        previewOnly: !usage.plan?.allowMidiDownload,
+        previewOnly: !usage.plan?.allowMidiDownload && !usage.plan?.allowSimulation,
         onProgress: (percent) => {
           setUploadPercent(percent);
           if (percent >= 99) {
@@ -1471,6 +1471,26 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
       setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
     } catch (error) {
       runSuccessAction(error instanceof Error ? error.message : 'Could not open generated PDF.');
+    }
+  };
+
+  const exportGeneratedMidi = async () => {
+    if (!generatedSheetId) {
+      runSuccessAction('No generated MIDI was returned for this transcription.');
+      return;
+    }
+
+    try {
+      const midi = await api.downloadGeneratedMidi(generatedSheetId);
+      const objectUrl = URL.createObjectURL(new Blob([midi], { type: 'audio/midi' }));
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${transcribedSong?.title || 'uniwave-sheet'}.mid`;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+      trackEvent('download_generated_sheet', { generation_id: generatedSheetId, file_type: 'midi' });
+    } catch (error) {
+      runSuccessAction(error instanceof Error ? error.message : 'Could not download generated MIDI.');
     }
   };
 
@@ -1732,11 +1752,17 @@ function UploadPage({ onTranscriptionComplete }: { onTranscriptionComplete: (son
               {activePlan?.allowPdfDownload && (
                 <button type="button" className="upload-success-action-primary" onClick={exportGeneratedSheet}>
                   <Download className="w-4 h-4" />
-                  Export
+                  PDF
+                </button>
+              )}
+              {activePlan?.allowMidiDownload && (
+                <button type="button" className="upload-success-action-primary" onClick={exportGeneratedMidi}>
+                  <Download className="w-4 h-4" />
+                  MIDI
                 </button>
               )}
             </div>
-            {activePlan?.allowSimulation ? (
+            {activePlan?.allowSimulation && transcribedSong ? (
               <button className="upload-success-btn" onClick={openMelodix}>
                 <Music className="w-5 h-5" />
                 Open Instrument Simulator
